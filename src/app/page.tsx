@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useAuth } from "@/hooks/useAuth";
 import AuthForm from "@/components/AuthForm";
 import DayLogger from "@/components/DayLogger";
