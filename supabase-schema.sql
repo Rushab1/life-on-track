@@ -33,10 +33,25 @@ create table workout_sets (
   created_at timestamptz default now()
 );
 
+create table plans (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users not null,
+  name text not null,
+  start_date date not null,
+  end_date date not null,
+  gym_schedule jsonb not null default '{}',
+  prep_schedule jsonb not null default '{}',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 alter table daily_logs enable row level security;
 alter table activity_completions enable row level security;
 alter table workout_sets enable row level security;
 
 create policy "own data" on daily_logs for all using (auth.uid() = user_id);
 create policy "own data" on activity_completions for all using (auth.uid() = user_id);
+alter table plans enable row level security;
+
 create policy "own data" on workout_sets for all using (auth.uid() = user_id);
+create policy "own data" on plans for all using (auth.uid() = user_id);

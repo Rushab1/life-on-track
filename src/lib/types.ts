@@ -47,3 +47,17 @@ export type ActivityType =
   | "pll"
   | "lgl"
   | "yga";
+
+export type GymType = "psh" | "lgh" | "rst" | "pll" | "lgl" | "yga";
+
+export interface Plan {
+  id: string;
+  user_id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  gym_schedule: Record<string, GymType>;
+  prep_schedule: Record<string, ActivityType[]>;
+  created_at: string;
+  updated_at: string;
+}

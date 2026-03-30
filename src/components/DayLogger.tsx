@@ -5,27 +5,36 @@ import { toDateString, addDays, isSameDay } from "@/lib/dates";
 import { getActivitiesForDate, isWorkoutDay } from "@/config/schedule";
 import { useDailyLog } from "@/hooks/useDailyLog";
 import { useActivities } from "@/hooks/useActivities";
+import { usePlans, getActivePlan } from "@/hooks/usePlans";
 import PainSlider from "./PainSlider";
 import ActivityChecklist from "./ActivityChecklist";
 import WorkoutLogger from "./WorkoutLogger";
 import DailyNotes from "./DailyNotes";
 import Calendar from "./Calendar";
+import PlanManager from "./PlanManager";
 
 interface DayLoggerProps {
   userId: string;
   onSignOut: () => void;
 }
 
+type Tab = "day" | "calendar" | "plans";
+
 export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState(today);
-  const [tab, setTab] = useState<"day" | "calendar">("day");
+  const [tab, setTab] = useState<Tab>("day");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const dateStr = toDateString(selectedDate);
-  const activities = getActivitiesForDate(selectedDate);
-  const showWorkout = isWorkoutDay(selectedDate);
   const isToday = isSameDay(selectedDate, today);
+
+  const { plans, create: createPlan, update: updatePlan, remove: removePlan } =
+    usePlans(userId);
+  const activePlan = getActivePlan(plans, dateStr);
+
+  const activities = getActivitiesForDate(selectedDate, activePlan);
+  const showWorkout = isWorkoutDay(selectedDate, activePlan);
 
   const dailyLog = useDailyLog(userId, dateStr);
   const activityData = useActivities(userId, dateStr);
@@ -99,6 +108,11 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
                 Jump to today
               </button>
             )}
+            {activePlan && (
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                {activePlan.name}
+              </p>
+            )}
           </div>
           <button
             onClick={goToNextDay}
@@ -112,35 +126,39 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
 
         {/* Tabs */}
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6">
-          <button
-            onClick={() => setTab("day")}
-            className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-              tab === "day"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500"
-            }`}
-          >
-            Day
-          </button>
-          <button
-            onClick={() => setTab("calendar")}
-            className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-              tab === "calendar"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500"
-            }`}
-          >
-            Calendar
-          </button>
+          {(["day", "calendar", "plans"] as Tab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+                tab === t
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500"
+              }`}
+            >
+              {t === "day" ? "Day" : t === "calendar" ? "Calendar" : "Plans"}
+            </button>
+          ))}
         </div>
 
-        {tab === "calendar" ? (
+        {tab === "calendar" && (
           <Calendar
             userId={userId}
             selectedDate={selectedDate}
             onSelectDate={handleCalendarSelect}
           />
-        ) : (
+        )}
+
+        {tab === "plans" && (
+          <PlanManager
+            plans={plans}
+            onCreate={createPlan}
+            onUpdate={updatePlan}
+            onDelete={removePlan}
+          />
+        )}
+
+        {tab === "day" && (
           <div className="space-y-4">
             <PainSlider
               value={dailyLog.painLevel}
@@ -157,7 +175,11 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
             />
 
             {showWorkout && (
-              <WorkoutLogger date={selectedDate} userId={userId} />
+              <WorkoutLogger
+                date={selectedDate}
+                userId={userId}
+                plan={activePlan}
+              />
             )}
 
             <DailyNotes
