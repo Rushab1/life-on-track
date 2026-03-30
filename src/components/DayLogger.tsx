@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { toDateString } from "@/lib/dates";
+import { toDateString, addDays, isSameDay } from "@/lib/dates";
 import { getActivitiesForDate, isWorkoutDay } from "@/config/schedule";
 import { useDailyLog } from "@/hooks/useDailyLog";
 import { useActivities } from "@/hooks/useActivities";
@@ -9,6 +9,7 @@ import PainSlider from "./PainSlider";
 import ActivityChecklist from "./ActivityChecklist";
 import WorkoutLogger from "./WorkoutLogger";
 import DailyNotes from "./DailyNotes";
+import Calendar from "./Calendar";
 
 interface DayLoggerProps {
   userId: string;
@@ -17,32 +18,58 @@ interface DayLoggerProps {
 
 export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
   const today = new Date();
-  const dateStr = toDateString(today);
-  const activities = getActivitiesForDate(today);
-  const showWorkout = isWorkoutDay(today);
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [tab, setTab] = useState<"day" | "calendar">("day");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const [tab, setTab] = useState<"today" | "calendar">("today");
+  const dateStr = toDateString(selectedDate);
+  const activities = getActivitiesForDate(selectedDate);
+  const showWorkout = isWorkoutDay(selectedDate);
+  const isToday = isSameDay(selectedDate, today);
+
   const dailyLog = useDailyLog(userId, dateStr);
   const activityData = useActivities(userId, dateStr);
 
-  const dayName = today.toLocaleDateString("en-US", { weekday: "long" });
-  const dateDisplay = today.toLocaleDateString("en-US", {
+  const dayName = selectedDate.toLocaleDateString("en-US", { weekday: "long" });
+  const dateDisplay = selectedDate.toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
     year: "numeric",
   });
 
+  function goToPrevDay() {
+    setSelectedDate((d) => addDays(d, -1));
+    setShowDeleteConfirm(false);
+  }
+
+  function goToNextDay() {
+    setSelectedDate((d) => addDays(d, 1));
+    setShowDeleteConfirm(false);
+  }
+
+  function goToToday() {
+    setSelectedDate(new Date());
+    setShowDeleteConfirm(false);
+  }
+
+  function handleCalendarSelect(date: Date) {
+    setSelectedDate(date);
+    setTab("day");
+    setShowDeleteConfirm(false);
+  }
+
+  async function handleDeleteDay() {
+    await dailyLog.deleteLog();
+    await activityData.clearAll();
+    setShowDeleteConfirm(false);
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-[600px] mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Life on Track</h1>
-            <p className="text-sm text-gray-500">
-              {dayName}, {dateDisplay}
-            </p>
-          </div>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-bold text-gray-900">Life on Track</h1>
           <button
             onClick={onSignOut}
             className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
@@ -51,17 +78,49 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
           </button>
         </div>
 
+        {/* Date navigation */}
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={goToPrevDay}
+            className="p-2 text-gray-500 hover:text-gray-900 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div className="text-center">
+            <p className="text-sm font-medium text-gray-900">{dayName}</p>
+            <p className="text-xs text-gray-500">{dateDisplay}</p>
+            {!isToday && (
+              <button
+                onClick={goToToday}
+                className="text-xs text-gray-400 hover:text-gray-700 mt-0.5 transition-colors"
+              >
+                Jump to today
+              </button>
+            )}
+          </div>
+          <button
+            onClick={goToNextDay}
+            className="p-2 text-gray-500 hover:text-gray-900 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+
         {/* Tabs */}
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6">
           <button
-            onClick={() => setTab("today")}
+            onClick={() => setTab("day")}
             className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-              tab === "today"
+              tab === "day"
                 ? "bg-white text-gray-900 shadow-sm"
                 : "text-gray-500"
             }`}
           >
-            Today
+            Day
           </button>
           <button
             onClick={() => setTab("calendar")}
@@ -76,9 +135,11 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
         </div>
 
         {tab === "calendar" ? (
-          <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
-            <p className="text-gray-400">Coming soon</p>
-          </div>
+          <Calendar
+            userId={userId}
+            selectedDate={selectedDate}
+            onSelectDate={handleCalendarSelect}
+          />
         ) : (
           <div className="space-y-4">
             <PainSlider
@@ -96,7 +157,7 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
             />
 
             {showWorkout && (
-              <WorkoutLogger date={today} userId={userId} />
+              <WorkoutLogger date={selectedDate} userId={userId} />
             )}
 
             <DailyNotes
@@ -104,6 +165,7 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
               onChange={dailyLog.setNotes}
             />
 
+            {/* Save button */}
             <button
               onClick={dailyLog.save}
               disabled={dailyLog.saving}
@@ -113,8 +175,37 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
                 ? "Saving..."
                 : dailyLog.saved
                   ? "Saved!"
-                  : "Save today's log"}
+                  : "Save day\u0027s log"}
             </button>
+
+            {/* Delete day */}
+            {dailyLog.hasLog && (
+              <div>
+                {showDeleteConfirm ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDeleteDay}
+                      className="flex-1 py-2.5 bg-red-600 text-white rounded-2xl text-sm font-medium hover:bg-red-700 transition-colors"
+                    >
+                      Confirm delete
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-2xl text-sm font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="w-full py-2.5 text-red-500 text-sm hover:text-red-700 transition-colors"
+                  >
+                    Delete this day&apos;s log
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

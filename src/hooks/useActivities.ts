@@ -13,6 +13,9 @@ export function useActivities(userId: string, dateStr: string) {
   >({} as Record<ActivityType, string>);
 
   const load = useCallback(async () => {
+    setCompletions({} as Record<ActivityType, boolean>);
+    setActivityNotes({} as Record<ActivityType, string>);
+
     const { data } = await supabase
       .from("activity_completions")
       .select("*")
@@ -67,5 +70,15 @@ export function useActivities(userId: string, dateStr: string) {
     setActivityNotes((prev) => ({ ...prev, [activity]: text }));
   }
 
-  return { completions, activityNotes, toggle, saveNote, setNote };
+  async function clearAll() {
+    await supabase
+      .from("activity_completions")
+      .delete()
+      .eq("user_id", userId)
+      .eq("date", dateStr);
+    setCompletions({} as Record<ActivityType, boolean>);
+    setActivityNotes({} as Record<ActivityType, string>);
+  }
+
+  return { completions, activityNotes, toggle, saveNote, setNote, clearAll };
 }

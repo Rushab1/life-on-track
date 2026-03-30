@@ -8,8 +8,13 @@ export function useDailyLog(userId: string, dateStr: string) {
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [hasLog, setHasLog] = useState(false);
 
   const load = useCallback(async () => {
+    setPainLevel(0);
+    setNotes("");
+    setHasLog(false);
+
     const { data } = await supabase
       .from("daily_logs")
       .select("*")
@@ -20,6 +25,7 @@ export function useDailyLog(userId: string, dateStr: string) {
     if (data) {
       setPainLevel(data.pain_level ?? 0);
       setNotes(data.notes ?? "");
+      setHasLog(true);
     }
   }, [userId, dateStr]);
 
@@ -41,8 +47,30 @@ export function useDailyLog(userId: string, dateStr: string) {
     );
     setSaving(false);
     setSaved(true);
+    setHasLog(true);
     setTimeout(() => setSaved(false), 2000);
   }
 
-  return { painLevel, setPainLevel, notes, setNotes, saving, saved, save };
+  async function deleteLog() {
+    await supabase
+      .from("daily_logs")
+      .delete()
+      .eq("user_id", userId)
+      .eq("date", dateStr);
+    setPainLevel(0);
+    setNotes("");
+    setHasLog(false);
+  }
+
+  return {
+    painLevel,
+    setPainLevel,
+    notes,
+    setNotes,
+    saving,
+    saved,
+    hasLog,
+    save,
+    deleteLog,
+  };
 }
