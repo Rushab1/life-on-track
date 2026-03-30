@@ -79,12 +79,21 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-xl font-bold text-gray-900">Life on Track</h1>
-          <button
-            onClick={onSignOut}
-            className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-          >
-            Sign out
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Autosave status */}
+            {dailyLog.saving && (
+              <span className="text-xs text-gray-400">Saving...</span>
+            )}
+            {dailyLog.saved && (
+              <span className="text-xs text-green-500">Saved</span>
+            )}
+            <button
+              onClick={onSignOut}
+              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
 
         {/* Date navigation */}
@@ -170,7 +179,6 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
               completions={activityData.completions}
               activityNotes={activityData.activityNotes}
               onToggle={activityData.toggle}
-              onSaveNote={activityData.saveNote}
               onSetNote={activityData.setNote}
             />
 
@@ -186,19 +194,6 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
               value={dailyLog.notes}
               onChange={dailyLog.setNotes}
             />
-
-            {/* Save button */}
-            <button
-              onClick={dailyLog.save}
-              disabled={dailyLog.saving}
-              className="w-full py-3 bg-gray-900 text-white rounded-2xl font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors"
-            >
-              {dailyLog.saving
-                ? "Saving..."
-                : dailyLog.saved
-                  ? "Saved!"
-                  : "Save day\u0027s log"}
-            </button>
 
             {/* Delete day */}
             {dailyLog.hasLog && (

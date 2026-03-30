@@ -9,7 +9,6 @@ interface ActivityChecklistProps {
   completions: Record<ActivityType, boolean>;
   activityNotes: Record<ActivityType, string>;
   onToggle: (activity: ActivityType) => void;
-  onSaveNote: (activity: ActivityType) => void;
   onSetNote: (activity: ActivityType, text: string) => void;
 }
 
@@ -18,7 +17,6 @@ export default function ActivityChecklist({
   completions,
   activityNotes,
   onToggle,
-  onSaveNote,
   onSetNote,
 }: ActivityChecklistProps) {
   const [expandedNotes, setExpandedNotes] = useState<Set<ActivityType>>(
@@ -82,22 +80,14 @@ export default function ActivityChecklist({
               </button>
             </div>
             {expandedNotes.has(activity) && (
-              <div className="ml-9 mt-2 flex gap-2">
+              <div className="ml-9 mt-2">
                 <input
                   type="text"
                   value={activityNotes[activity] || ""}
                   onChange={(e) => onSetNote(activity, e.target.value)}
-                  placeholder="Add a note..."
-                  className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  placeholder="Add a note (autosaves)..."
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
                 />
-                {completions[activity] && (
-                  <button
-                    onClick={() => onSaveNote(activity)}
-                    className="px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 transition-colors"
-                  >
-                    Save
-                  </button>
-                )}
               </div>
             )}
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 
 export function useDailyLog(userId: string, dateStr: string) {
@@ -9,8 +9,11 @@ export function useDailyLog(userId: string, dateStr: string) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [hasLog, setHasLog] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   const load = useCallback(async () => {
+    setLoaded(false);
     setPainLevel(0);
     setNotes("");
     setHasLog(false);
@@ -27,31 +30,50 @@ export function useDailyLog(userId: string, dateStr: string) {
       setNotes(data.notes ?? "");
       setHasLog(true);
     }
+    setLoaded(true);
   }, [userId, dateStr]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  async function save() {
-    setSaving(true);
-    await supabase.from("daily_logs").upsert(
-      {
-        user_id: userId,
-        date: dateStr,
-        pain_level: painLevel,
-        notes: notes || null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id,date" }
-    );
-    setSaving(false);
-    setSaved(true);
-    setHasLog(true);
-    setTimeout(() => setSaved(false), 2000);
+  const autosave = useCallback(
+    (newPain: number, newNotes: string) => {
+      if (!loaded) return;
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(async () => {
+        setSaving(true);
+        await supabase.from("daily_logs").upsert(
+          {
+            user_id: userId,
+            date: dateStr,
+            pain_level: newPain,
+            notes: newNotes || null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,date" }
+        );
+        setSaving(false);
+        setSaved(true);
+        setHasLog(true);
+        setTimeout(() => setSaved(false), 2000);
+      }, 1500);
+    },
+    [userId, dateStr, loaded]
+  );
+
+  function updatePainLevel(value: number) {
+    setPainLevel(value);
+    autosave(value, notes);
+  }
+
+  function updateNotes(value: string) {
+    setNotes(value);
+    autosave(painLevel, value);
   }
 
   async function deleteLog() {
+    clearTimeout(debounceRef.current);
     await supabase
       .from("daily_logs")
       .delete()
@@ -62,15 +84,19 @@ export function useDailyLog(userId: string, dateStr: string) {
     setHasLog(false);
   }
 
+  // Cleanup debounce on unmount or date change
+  useEffect(() => {
+    return () => clearTimeout(debounceRef.current);
+  }, [dateStr]);
+
   return {
     painLevel,
-    setPainLevel,
+    setPainLevel: updatePainLevel,
     notes,
-    setNotes,
+    setNotes: updateNotes,
     saving,
     saved,
     hasLog,
-    save,
     deleteLog,
   };
 }

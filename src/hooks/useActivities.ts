@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import type { ActivityType, ActivityCompletion } from "@/lib/types";
 
@@ -11,6 +11,7 @@ export function useActivities(userId: string, dateStr: string) {
   const [activityNotes, setActivityNotes] = useState<
     Record<ActivityType, string>
   >({} as Record<ActivityType, string>);
+  const noteDebounceRefs = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const load = useCallback(async () => {
     setCompletions({} as Record<ActivityType, boolean>);
@@ -38,6 +39,14 @@ export function useActivities(userId: string, dateStr: string) {
     load();
   }, [load]);
 
+  // Cleanup debounces on unmount or date change
+  useEffect(() => {
+    return () => {
+      Object.values(noteDebounceRefs.current).forEach(clearTimeout);
+      noteDebounceRefs.current = {};
+    };
+  }, [dateStr]);
+
   async function toggle(activity: ActivityType) {
     const newVal = !completions[activity];
     setCompletions((prev) => ({ ...prev, [activity]: newVal }));
@@ -53,24 +62,27 @@ export function useActivities(userId: string, dateStr: string) {
     );
   }
 
-  async function saveNote(activity: ActivityType) {
-    await supabase.from("activity_completions").upsert(
-      {
-        user_id: userId,
-        date: dateStr,
-        activity_type: activity,
-        completed: completions[activity] ?? false,
-        notes: activityNotes[activity] || null,
-      },
-      { onConflict: "user_id,date,activity_type" }
-    );
-  }
-
   function setNote(activity: ActivityType, text: string) {
     setActivityNotes((prev) => ({ ...prev, [activity]: text }));
+
+    // Debounced autosave for notes
+    clearTimeout(noteDebounceRefs.current[activity]);
+    noteDebounceRefs.current[activity] = setTimeout(async () => {
+      await supabase.from("activity_completions").upsert(
+        {
+          user_id: userId,
+          date: dateStr,
+          activity_type: activity,
+          completed: completions[activity] ?? false,
+          notes: text || null,
+        },
+        { onConflict: "user_id,date,activity_type" }
+      );
+    }, 1500);
   }
 
   async function clearAll() {
+    Object.values(noteDebounceRefs.current).forEach(clearTimeout);
     await supabase
       .from("activity_completions")
       .delete()
@@ -80,5 +92,5 @@ export function useActivities(userId: string, dateStr: string) {
     setActivityNotes({} as Record<ActivityType, string>);
   }
 
-  return { completions, activityNotes, toggle, saveNote, setNote, clearAll };
+  return { completions, activityNotes, toggle, setNote, clearAll };
 }
