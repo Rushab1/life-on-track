@@ -1,29 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
-import type { User } from "@supabase/supabase-js";
+import { useAuth } from "@/hooks/useAuth";
 import AuthForm from "@/components/AuthForm";
 import DayLogger from "@/components/DayLogger";
 
 export default function Home() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+  const { user, loading, signOut } = useAuth();
 
   if (loading) {
     return (
@@ -37,12 +19,5 @@ export default function Home() {
     return <AuthForm />;
   }
 
-  return (
-    <DayLogger
-      userId={user.id}
-      onSignOut={async () => {
-        await supabase.auth.signOut();
-      }}
-    />
-  );
+  return <DayLogger userId={user.id} onSignOut={signOut} />;
 }

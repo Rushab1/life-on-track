@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
-import { EXERCISES, getGymType, getLocalDateString } from "@/lib/types";
-import type { WorkoutSet } from "@/lib/types";
+import { useState } from "react";
+import { toDateString } from "@/lib/dates";
+import { EXERCISES } from "@/config/exercises";
+import { getGymLabel } from "@/config/schedule";
+import { useWorkoutSets } from "@/hooks/useWorkoutSets";
 
 interface WorkoutLoggerProps {
   date: Date;
@@ -11,36 +12,17 @@ interface WorkoutLoggerProps {
 }
 
 export default function WorkoutLogger({ date, userId }: WorkoutLoggerProps) {
-  const [exercise, setExercise] = useState(EXERCISES[0]);
+  const dateStr = toDateString(date);
+  const { sets: loggedSets, loading, add, remove } = useWorkoutSets(userId, dateStr);
+
+  const [exercise, setExercise] = useState<string>(EXERCISES[0]);
   const [sets, setSets] = useState("");
   const [reps, setReps] = useState("");
   const [weight, setWeight] = useState("");
   const [duration, setDuration] = useState("");
-  const [loggedSets, setLoggedSets] = useState<WorkoutSet[]>([]);
-  const [loading, setLoading] = useState(false);
 
-  const dateStr = getLocalDateString(date);
-
-  useEffect(() => {
-    fetchSets();
-  }, [dateStr]);
-
-  async function fetchSets() {
-    const { data } = await supabase
-      .from("workout_sets")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("date", dateStr)
-      .order("created_at", { ascending: true });
-
-    if (data) setLoggedSets(data);
-  }
-
-  async function logSet() {
-    setLoading(true);
-    await supabase.from("workout_sets").insert({
-      user_id: userId,
-      date: dateStr,
+  async function handleLogSet() {
+    await add({
       exercise,
       sets: sets ? Number(sets) : null,
       reps: reps ? Number(reps) : null,
@@ -51,19 +33,12 @@ export default function WorkoutLogger({ date, userId }: WorkoutLoggerProps) {
     setReps("");
     setWeight("");
     setDuration("");
-    await fetchSets();
-    setLoading(false);
-  }
-
-  async function deleteSet(id: string) {
-    await supabase.from("workout_sets").delete().eq("id", id);
-    setLoggedSets((prev) => prev.filter((s) => s.id !== id));
   }
 
   return (
     <div className="bg-white rounded-2xl shadow-sm p-4">
       <h3 className="text-sm font-medium text-gray-700 mb-3">
-        Workout — {getGymType(date)}
+        Workout — {getGymLabel(date)}
       </h3>
 
       <select
@@ -110,7 +85,7 @@ export default function WorkoutLogger({ date, userId }: WorkoutLoggerProps) {
       </div>
 
       <button
-        onClick={logSet}
+        onClick={handleLogSet}
         disabled={loading}
         className="w-full py-2 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors mb-3"
       >
@@ -140,7 +115,7 @@ export default function WorkoutLogger({ date, userId }: WorkoutLoggerProps) {
                 )}
               </div>
               <button
-                onClick={() => deleteSet(s.id)}
+                onClick={() => remove(s.id)}
                 className="text-gray-400 hover:text-red-500 font-bold text-lg leading-none"
               >
                 &times;

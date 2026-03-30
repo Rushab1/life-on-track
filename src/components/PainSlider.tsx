@@ -1,6 +1,6 @@
 "use client";
 
-import { PAIN_COLORS } from "@/lib/types";
+import { PAIN_COLORS } from "@/config/constants";
 
 interface PainSliderProps {
   value: number;
