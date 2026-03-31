@@ -1,0 +1,215 @@
+import { z } from "zod";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { getClient } from "../auth.js";
+import type { WorkoutSet } from "../types.js";
+
+const exerciseSchema = z.object({
+  exercise: z.string().describe("Exercise name (e.g. 'Bench Press')"),
+  sets: z.number().optional().describe("Number of sets"),
+  reps: z.number().optional().describe("Reps per set"),
+  weight_lbs: z.number().optional().describe("Weight in pounds"),
+  duration_mins: z.number().optional().describe("Duration in minutes"),
+  notes: z.string().optional().describe("Notes for this exercise"),
+});
+
+export function registerWorkoutTools(server: McpServer) {
+  server.tool(
+    "get_workout_sets",
+    "Get all workout sets logged for a date",
+    { date: z.string().describe("Date in YYYY-MM-DD format") },
+    async ({ date }) => {
+      const { data, error } = await getClient()
+        .from("workout_sets")
+        .select("*")
+        .eq("date", date)
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      }
+
+      if (!data || data.length === 0) {
+        return { content: [{ type: "text" as const, text: `No workout sets logged for ${date}.` }] };
+      }
+
+      const sets = data as WorkoutSet[];
+      const summary = sets.map((s) => ({
+        id: s.id,
+        exercise: s.exercise,
+        sets: s.sets,
+        reps: s.reps,
+        weight_lbs: s.weight_lbs,
+        duration_mins: s.duration_mins,
+        notes: s.notes,
+      }));
+
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(summary, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "log_workout_set",
+    "Log a single exercise set",
+    {
+      date: z.string().describe("Date in YYYY-MM-DD format"),
+      exercise: z.string().describe("Exercise name"),
+      sets: z.number().optional().describe("Number of sets"),
+      reps: z.number().optional().describe("Reps per set"),
+      weight_lbs: z.number().optional().describe("Weight in pounds"),
+      duration_mins: z.number().optional().describe("Duration in minutes"),
+      notes: z.string().optional().describe("Notes"),
+    },
+    async ({ date, exercise, sets, reps, weight_lbs, duration_mins, notes }) => {
+      const client = getClient();
+      const { data: { user } } = await client.auth.getUser();
+      if (!user) {
+        return { content: [{ type: "text" as const, text: "Error: Not authenticated" }] };
+      }
+
+      const { error } = await client.from("workout_sets").insert({
+        user_id: user.id,
+        date,
+        exercise,
+        sets: sets ?? null,
+        reps: reps ?? null,
+        weight_lbs: weight_lbs ?? null,
+        duration_mins: duration_mins ?? null,
+        notes: notes ?? null,
+      });
+
+      if (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      }
+
+      let desc = `Logged ${exercise} for ${date}`;
+      if (sets && reps) desc += ` — ${sets}x${reps}`;
+      if (weight_lbs) desc += ` @ ${weight_lbs} lbs`;
+      if (duration_mins) desc += ` for ${duration_mins} min`;
+
+      return { content: [{ type: "text" as const, text: desc }] };
+    }
+  );
+
+  server.tool(
+    "log_workout",
+    "Log a full workout with multiple exercises at once",
+    {
+      date: z.string().describe("Date in YYYY-MM-DD format"),
+      exercises: z.array(exerciseSchema).describe("Array of exercises to log"),
+    },
+    async ({ date, exercises }) => {
+      const client = getClient();
+      const { data: { user } } = await client.auth.getUser();
+      if (!user) {
+        return { content: [{ type: "text" as const, text: "Error: Not authenticated" }] };
+      }
+
+      const rows = exercises.map((e) => ({
+        user_id: user.id,
+        date,
+        exercise: e.exercise,
+        sets: e.sets ?? null,
+        reps: e.reps ?? null,
+        weight_lbs: e.weight_lbs ?? null,
+        duration_mins: e.duration_mins ?? null,
+        notes: e.notes ?? null,
+      }));
+
+      const { error } = await client.from("workout_sets").insert(rows);
+
+      if (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      }
+
+      const lines = exercises.map((e) => {
+        let desc = `  - ${e.exercise}`;
+        if (e.sets && e.reps) desc += ` ${e.sets}x${e.reps}`;
+        if (e.weight_lbs) desc += ` @ ${e.weight_lbs} lbs`;
+        if (e.duration_mins) desc += ` for ${e.duration_mins} min`;
+        return desc;
+      });
+
+      return {
+        content: [{
+          type: "text" as const,
+          text: `Logged ${exercises.length} exercises for ${date}:\n${lines.join("\n")}`,
+        }],
+      };
+    }
+  );
+
+  server.tool(
+    "delete_workout_set",
+    "Delete a logged workout set by ID",
+    { id: z.string().describe("The workout set ID to delete") },
+    async ({ id }) => {
+      const { error } = await getClient()
+        .from("workout_sets")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      }
+
+      return { content: [{ type: "text" as const, text: `Workout set ${id} deleted.` }] };
+    }
+  );
+
+  server.tool(
+    "get_last_workout",
+    "Get the most recent workout sets for given exercises (before a date), useful for progressive overload",
+    {
+      date: z.string().describe("Date in YYYY-MM-DD format — will look for sessions before this date"),
+      exercises: z.array(z.string()).describe("Exercise names to look up"),
+    },
+    async ({ date, exercises }) => {
+      if (exercises.length === 0) {
+        return { content: [{ type: "text" as const, text: "No exercises specified." }] };
+      }
+
+      const { data, error } = await getClient()
+        .from("workout_sets")
+        .select("exercise, reps, weight_lbs, duration_mins, date")
+        .lt("date", date)
+        .in("exercise", exercises)
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      }
+
+      if (!data || data.length === 0) {
+        return { content: [{ type: "text" as const, text: "No previous workout data found for these exercises." }] };
+      }
+
+      // Group by exercise, taking only the most recent date for each
+      const latestDate: Record<string, string> = {};
+      for (const row of data) {
+        if (!latestDate[row.exercise]) {
+          latestDate[row.exercise] = row.date;
+        }
+      }
+
+      const result: Record<string, { reps: number | null; weight_lbs: number | null; duration_mins: number | null; date: string }[]> = {};
+      for (const row of data) {
+        if (row.date === latestDate[row.exercise]) {
+          if (!result[row.exercise]) result[row.exercise] = [];
+          result[row.exercise].push({
+            reps: row.reps,
+            weight_lbs: row.weight_lbs,
+            duration_mins: row.duration_mins,
+            date: row.date,
+          });
+        }
+      }
+
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+      };
+    }
+  );
+}

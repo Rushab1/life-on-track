@@ -55,3 +55,17 @@ alter table plans enable row level security;
 
 create policy "own data" on workout_sets for all using (auth.uid() = user_id);
 create policy "own data" on plans for all using (auth.uid() = user_id);
+
+-- MCP token management
+create table mcp_tokens (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  name text not null,
+  token_hash text not null,
+  last_used_at timestamptz,
+  revoked boolean default false,
+  created_at timestamptz default now()
+);
+
+alter table mcp_tokens enable row level security;
+create policy "own tokens" on mcp_tokens for all using (auth.uid() = user_id);

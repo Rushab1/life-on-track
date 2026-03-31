@@ -12,13 +12,14 @@ import WorkoutLogger from "./WorkoutLogger";
 import DailyNotes from "./DailyNotes";
 import Calendar from "./Calendar";
 import PlanManager from "./PlanManager";
+import McpTokenManager from "./McpTokenManager";
 
 interface DayLoggerProps {
   userId: string;
   onSignOut: () => void;
 }
 
-type Tab = "day" | "calendar" | "plans";
+type Tab = "day" | "calendar" | "plans" | "settings";
 
 export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
   const today = new Date();
@@ -135,7 +136,7 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
 
         {/* Tabs */}
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6">
-          {(["day", "calendar", "plans"] as Tab[]).map((t) => (
+          {(["day", "calendar", "plans", "settings"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -145,7 +146,7 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
                   : "text-gray-500"
               }`}
             >
-              {t === "day" ? "Day" : t === "calendar" ? "Calendar" : "Plans"}
+              {t === "day" ? "Day" : t === "calendar" ? "Calendar" : t === "plans" ? "Plans" : "Settings"}
             </button>
           ))}
         </div>
@@ -156,6 +157,10 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
             selectedDate={selectedDate}
             onSelectDate={handleCalendarSelect}
           />
+        )}
+
+        {tab === "settings" && (
+          <McpTokenManager userId={userId} />
         )}
 
         {tab === "plans" && (
