@@ -334,7 +334,6 @@ function ExerciseAccordion({
               prefill={prefill}
               onSave={async (r, w, d) => {
                 await onLog({ exercise, sets: null, reps: r, weight_lbs: w, duration_mins: d });
-                setShowPending(false);
               }}
               onUpdate={async () => {}}
               onRemove={() => setShowPending(false)}
