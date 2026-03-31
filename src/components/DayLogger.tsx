@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { toDateString, addDays, isSameDay } from "@/lib/dates";
-import { getActivitiesForDate, isWorkoutDay } from "@/config/schedule";
+import { getActivitiesForDate, isWorkoutDay, getGymType } from "@/config/schedule";
 import { useDailyLog } from "@/hooks/useDailyLog";
 import { useActivities } from "@/hooks/useActivities";
 import { usePlans, getActivePlan } from "@/hooks/usePlans";
+import { useCustomTopics } from "@/hooks/useCustomTopics";
 import PainSlider from "./PainSlider";
 import ActivityChecklist from "./ActivityChecklist";
 import WorkoutLogger from "./WorkoutLogger";
@@ -33,8 +34,21 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
     usePlans(userId);
   const activePlan = getActivePlan(plans, dateStr);
 
+  const {
+    activityLabels,
+    gymOptions,
+    prepOptions,
+    exercises: allExercises,
+    workoutExercises,
+    topics: customTopics,
+    addTopic,
+    removeTopic,
+  } = useCustomTopics(userId);
+
   const activities = getActivitiesForDate(selectedDate, activePlan);
   const showWorkout = isWorkoutDay(selectedDate, activePlan);
+  const gymType = getGymType(selectedDate, activePlan);
+  const gymLabel = activityLabels[gymType] ?? gymType;
 
   const dailyLog = useDailyLog(userId, dateStr);
   const activityData = useActivities(userId, dateStr);
@@ -161,6 +175,12 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
         {tab === "plans" && (
           <PlanManager
             plans={plans}
+            gymOptions={gymOptions}
+            prepOptions={prepOptions}
+            activityLabels={activityLabels}
+            customTopics={customTopics}
+            onAddTopic={addTopic}
+            onRemoveTopic={removeTopic}
             onCreate={createPlan}
             onUpdate={updatePlan}
             onDelete={removePlan}
@@ -178,6 +198,7 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
               activities={activities}
               completions={activityData.completions}
               activityNotes={activityData.activityNotes}
+              activityLabels={activityLabels}
               onToggle={activityData.toggle}
               onSetNote={activityData.setNote}
             />
@@ -187,6 +208,10 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
                 date={selectedDate}
                 userId={userId}
                 plan={activePlan}
+                exercises={allExercises}
+                workoutExercises={workoutExercises}
+                gymLabel={gymLabel}
+                onAddExercise={(label) => addTopic("exercise", label)}
               />
             )}
 

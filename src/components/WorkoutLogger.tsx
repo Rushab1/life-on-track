@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { toDateString } from "@/lib/dates";
-import { EXERCISES, WORKOUT_EXERCISES } from "@/config/exercises";
-import { getGymLabel, getGymType } from "@/config/schedule";
+import { getGymType } from "@/config/schedule";
 import { useWorkoutSets } from "@/hooks/useWorkoutSets";
 import { useLastWorkout } from "@/hooks/useLastWorkout";
 import type { LastSetRow } from "@/hooks/useLastWorkout";
@@ -13,17 +12,31 @@ interface WorkoutLoggerProps {
   date: Date;
   userId: string;
   plan?: Plan | null;
+  exercises: string[];
+  workoutExercises: Record<string, string[]>;
+  gymLabel: string;
+  onAddExercise: (label: string) => Promise<void>;
 }
 
-export default function WorkoutLogger({ date, userId, plan }: WorkoutLoggerProps) {
+export default function WorkoutLogger({
+  date,
+  userId,
+  plan,
+  exercises,
+  workoutExercises,
+  gymLabel,
+  onAddExercise,
+}: WorkoutLoggerProps) {
   const dateStr = toDateString(date);
   const gymType = getGymType(date, plan);
-  const defaultExercises = WORKOUT_EXERCISES[gymType] ?? [];
+  const defaultExercises = workoutExercises[gymType] ?? [];
   const { sets: loggedSets, loading, add, remove } = useWorkoutSets(userId, dateStr);
   const lastSets = useLastWorkout(userId, dateStr, defaultExercises);
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [extraExercise, setExtraExercise] = useState("");
+  const [addingExercise, setAddingExercise] = useState(false);
+  const [newExerciseName, setNewExerciseName] = useState("");
 
   function toggleExpand(exercise: string) {
     setExpanded((prev) => {
@@ -32,6 +45,15 @@ export default function WorkoutLogger({ date, userId, plan }: WorkoutLoggerProps
       else next.add(exercise);
       return next;
     });
+  }
+
+  async function handleAddExercise() {
+    if (!newExerciseName.trim()) return;
+    await onAddExercise(newExerciseName.trim());
+    setExtraExercise(newExerciseName.trim());
+    setExpanded((prev) => new Set(prev).add(newExerciseName.trim()));
+    setNewExerciseName("");
+    setAddingExercise(false);
   }
 
   // Group logged sets by exercise
@@ -44,7 +66,7 @@ export default function WorkoutLogger({ date, userId, plan }: WorkoutLoggerProps
   return (
     <div className="bg-white rounded-2xl shadow-sm p-4">
       <h3 className="text-sm font-medium text-gray-700 mb-3">
-        Workout — {getGymLabel(date, plan)}
+        Workout — {gymLabel}
       </h3>
 
       <div className="space-y-1">
@@ -76,6 +98,10 @@ export default function WorkoutLogger({ date, userId, plan }: WorkoutLoggerProps
         <select
           value={extraExercise}
           onChange={(e) => {
+            if (e.target.value === "__add_new__") {
+              setAddingExercise(true);
+              return;
+            }
             setExtraExercise(e.target.value);
             if (e.target.value) {
               setExpanded((prev) => new Set(prev).add(e.target.value));
@@ -84,10 +110,50 @@ export default function WorkoutLogger({ date, userId, plan }: WorkoutLoggerProps
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
         >
           <option value="">+ Add other exercise...</option>
-          {EXERCISES.filter((ex) => !defaultExercises.includes(ex)).map((ex) => (
-            <option key={ex} value={ex}>{ex}</option>
-          ))}
+          {exercises
+            .filter((ex) => !defaultExercises.includes(ex))
+            .map((ex) => (
+              <option key={ex} value={ex}>
+                {ex}
+              </option>
+            ))}
+          <option value="__add_new__">+ Create new exercise...</option>
         </select>
+
+        {addingExercise && (
+          <div className="flex items-center gap-2 mt-2">
+            <input
+              type="text"
+              value={newExerciseName}
+              onChange={(e) => setNewExerciseName(e.target.value)}
+              placeholder="Exercise name..."
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddExercise();
+                }
+              }}
+              className="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              autoFocus
+            />
+            <button
+              onClick={handleAddExercise}
+              className="px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              Add
+            </button>
+            <button
+              onClick={() => {
+                setAddingExercise(false);
+                setNewExerciseName("");
+              }}
+              className="px-3 py-1.5 text-gray-500 text-xs"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
         {extraExercise && (
           <div className="mt-2">
             <ExerciseAccordion
@@ -141,12 +207,11 @@ function ExerciseAccordion({
 
   // Prefill from the next unlogged set in history
   const nextSetIndex = setCount;
-  const prefill = historySets[nextSetIndex] ?? historySets[historySets.length - 1];
+  const prefill =
+    historySets[nextSetIndex] ?? historySets[historySets.length - 1];
 
   // Summary for collapsed state
-  const histSummary = historySets.length > 0
-    ? `${historySets.length} sets`
-    : "";
+  const histSummary = historySets.length > 0 ? `${historySets.length} sets` : "";
 
   async function handleLog() {
     const finalReps = reps || prefill?.reps?.toString() || "";
@@ -177,7 +242,11 @@ function ExerciseAccordion({
             stroke="currentColor"
             strokeWidth={2}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9 5l7 7-7 7"
+            />
           </svg>
           <span className="text-sm font-medium text-gray-800">{exercise}</span>
           {setCount > 0 && (
@@ -187,7 +256,9 @@ function ExerciseAccordion({
           )}
         </div>
         {!isOpen && histSummary && (
-          <span className="text-[10px] text-gray-400">last: {histSummary}</span>
+          <span className="text-[10px] text-gray-400">
+            last: {histSummary}
+          </span>
         )}
       </button>
 
@@ -201,12 +272,24 @@ function ExerciseAccordion({
               className="flex items-center justify-between bg-green-50 px-2.5 py-1.5 rounded-lg text-sm"
             >
               <div className="flex items-center gap-2 text-gray-700">
-                <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                <svg
+                  className="w-4 h-4 text-green-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
                 <span className="text-gray-500 text-xs">Set {i + 1}</span>
                 {s.reps && <span>{s.reps} reps</span>}
-                {s.weight_lbs && <span className="text-gray-500">@ {s.weight_lbs}lbs</span>}
+                {s.weight_lbs && (
+                  <span className="text-gray-500">@ {s.weight_lbs}lbs</span>
+                )}
               </div>
               <button
                 onClick={() => onRemove(s.id)}
@@ -248,7 +331,8 @@ function ExerciseAccordion({
           {/* History preview */}
           {historySets.length > 0 && (
             <div className="text-[10px] text-gray-400 pt-1">
-              Last session: {historySets.map((h, i) => (
+              Last session:{" "}
+              {historySets.map((h, i) => (
                 <span key={i}>
                   {i > 0 && ", "}
                   {h.reps}r{h.weight_lbs ? `@${h.weight_lbs}` : ""}

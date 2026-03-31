@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { ACTIVITY_LABELS } from "@/config/constants";
 import type { ActivityType } from "@/lib/types";
 
 interface ActivityChecklistProps {
   activities: ActivityType[];
-  completions: Record<ActivityType, boolean>;
-  activityNotes: Record<ActivityType, string>;
+  completions: Record<string, boolean>;
+  activityNotes: Record<string, string>;
+  activityLabels: Record<string, string>;
   onToggle: (activity: ActivityType) => void;
   onSetNote: (activity: ActivityType, text: string) => void;
 }
@@ -16,14 +16,13 @@ export default function ActivityChecklist({
   activities,
   completions,
   activityNotes,
+  activityLabels,
   onToggle,
   onSetNote,
 }: ActivityChecklistProps) {
-  const [expandedNotes, setExpandedNotes] = useState<Set<ActivityType>>(
-    new Set()
-  );
+  const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
 
-  function toggleExpand(activity: ActivityType) {
+  function toggleExpand(activity: string) {
     setExpandedNotes((prev) => {
       const next = new Set(prev);
       if (next.has(activity)) next.delete(activity);
@@ -70,7 +69,7 @@ export default function ActivityChecklist({
                     : "text-gray-700"
                 }`}
               >
-                {ACTIVITY_LABELS[activity]}
+                {activityLabels[activity] ?? activity}
               </span>
               <button
                 onClick={() => toggleExpand(activity)}

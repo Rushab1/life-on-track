@@ -1,37 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { ACTIVITY_LABELS } from "@/config/constants";
 import {
   DEFAULT_GYM_SCHEDULE,
   DEFAULT_PREP_SCHEDULE,
 } from "@/config/schedule";
-import type { ActivityType, GymType, Plan } from "@/lib/types";
+import type { Plan, CustomTopic } from "@/lib/types";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const GYM_OPTIONS: { value: GymType; label: string }[] = [
-  { value: "rst", label: "Rest" },
-  { value: "psh", label: "Push" },
-  { value: "lgh", label: "Legs Heavy" },
-  { value: "pll", label: "Pull" },
-  { value: "lgl", label: "Legs Light" },
-  { value: "yga", label: "Yoga" },
-];
-
-const PREP_OPTIONS: { value: ActivityType; label: string }[] = [
-  { value: "lc", label: "LeetCode" },
-  { value: "ml", label: "ML/AI" },
-  { value: "sd", label: "System Design" },
-  { value: "beh", label: "Behavioral" },
-  { value: "oss", label: "FastMCP" },
-  { value: "vln", label: "Violin" },
-  { value: "dte", label: "Date Night" },
-  { value: "mck", label: "Mock Interview" },
-  { value: "out", label: "Outdoor Activity" },
-];
 
 interface PlanManagerProps {
   plans: Plan[];
+  gymOptions: { value: string; label: string }[];
+  prepOptions: { value: string; label: string }[];
+  activityLabels: Record<string, string>;
+  customTopics: CustomTopic[];
+  onAddTopic: (
+    category: "exercise" | "activity" | "gym_type",
+    label: string
+  ) => Promise<void>;
+  onRemoveTopic: (id: string) => Promise<void>;
   onCreate: (plan: {
     name: string;
     start_date: string;
@@ -54,12 +42,19 @@ interface PlanManagerProps {
 
 export default function PlanManager({
   plans,
+  gymOptions,
+  prepOptions,
+  activityLabels,
+  customTopics,
+  onAddTopic,
+  onRemoveTopic,
   onCreate,
   onUpdate,
   onDelete,
 }: PlanManagerProps) {
-  const [editing, setEditing] = useState<string | null>(null); // plan id or "new"
+  const [editing, setEditing] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [showManage, setShowManage] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -69,6 +64,9 @@ export default function PlanManager({
           {editing === plan.id ? (
             <PlanForm
               initial={plan}
+              gymOptions={gymOptions}
+              prepOptions={prepOptions}
+              onAddTopic={onAddTopic}
               onSave={async (data) => {
                 await onUpdate(plan.id, data);
                 setEditing(null);
@@ -130,11 +128,11 @@ export default function PlanManager({
                         {day}
                       </p>
                       <p className="text-[10px] text-gray-700">
-                        {ACTIVITY_LABELS[gym as ActivityType]}
+                        {activityLabels[gym] ?? gym}
                       </p>
                       {prep.map((a: string) => (
                         <p key={a} className="text-[10px] text-gray-400">
-                          {ACTIVITY_LABELS[a as ActivityType]}
+                          {activityLabels[a] ?? a}
                         </p>
                       ))}
                     </div>
@@ -149,6 +147,9 @@ export default function PlanManager({
       {/* Create new plan */}
       {editing === "new" ? (
         <PlanForm
+          gymOptions={gymOptions}
+          prepOptions={prepOptions}
+          onAddTopic={onAddTopic}
           onSave={async (data) => {
             await onCreate(data);
             setEditing(null);
@@ -163,6 +164,42 @@ export default function PlanManager({
           + Create new plan
         </button>
       )}
+
+      {/* Manage custom topics */}
+      {customTopics.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowManage(!showManage)}
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            {showManage ? "Hide" : "Manage"} custom topics (
+            {customTopics.length})
+          </button>
+          {showManage && (
+            <div className="mt-2 bg-white rounded-2xl shadow-sm p-4 space-y-2">
+              {customTopics.map((t) => (
+                <div
+                  key={t.id}
+                  className="flex items-center justify-between"
+                >
+                  <div>
+                    <span className="text-sm text-gray-700">{t.label}</span>
+                    <span className="text-xs text-gray-400 ml-2">
+                      {t.category === "gym_type" ? "workout" : t.category}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => onRemoveTopic(t.id)}
+                    className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -170,10 +207,19 @@ export default function PlanManager({
 /** Reusable form for creating / editing a plan. */
 function PlanForm({
   initial,
+  gymOptions,
+  prepOptions,
+  onAddTopic,
   onSave,
   onCancel,
 }: {
   initial?: Plan;
+  gymOptions: { value: string; label: string }[];
+  prepOptions: { value: string; label: string }[];
+  onAddTopic: (
+    category: "exercise" | "activity" | "gym_type",
+    label: string
+  ) => Promise<void>;
   onSave: (data: {
     name: string;
     start_date: string;
@@ -194,11 +240,14 @@ function PlanForm({
   );
   const [saving, setSaving] = useState(false);
 
+  const [adding, setAdding] = useState<"gym_type" | "activity" | null>(null);
+  const [newLabel, setNewLabel] = useState("");
+
   function setGym(day: string, value: string) {
     setGymSchedule((prev) => ({ ...prev, [day]: value }));
   }
 
-  function togglePrep(day: string, activity: ActivityType) {
+  function togglePrep(day: string, activity: string) {
     setPrepSchedule((prev) => {
       const current = prev[day] ?? [];
       const next = current.includes(activity)
@@ -206,6 +255,13 @@ function PlanForm({
         : [...current, activity];
       return { ...prev, [day]: next };
     });
+  }
+
+  async function handleAddTopic() {
+    if (!newLabel.trim() || !adding) return;
+    await onAddTopic(adding, newLabel.trim());
+    setNewLabel("");
+    setAdding(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -237,7 +293,9 @@ function PlanForm({
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Start date</label>
+          <label className="block text-xs text-gray-500 mb-1">
+            Start date
+          </label>
           <input
             type="date"
             value={startDate}
@@ -277,18 +335,26 @@ function PlanForm({
                   </span>
                   <select
                     value={gymSchedule[day] ?? "rst"}
-                    onChange={(e) => setGym(day, e.target.value)}
+                    onChange={(e) => {
+                      if (e.target.value === "__add_gym__") {
+                        setAdding("gym_type");
+                        setNewLabel("");
+                      } else {
+                        setGym(day, e.target.value);
+                      }
+                    }}
                     className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
                   >
-                    {GYM_OPTIONS.map((opt) => (
+                    {gymOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
                       </option>
                     ))}
+                    <option value="__add_gym__">+ New workout type...</option>
                   </select>
                 </div>
                 <div className="flex flex-wrap gap-1.5 ml-[52px]">
-                  {PREP_OPTIONS.map((opt) => {
+                  {prepOptions.map((opt) => {
                     const active = (prepSchedule[day] ?? []).includes(
                       opt.value
                     );
@@ -307,11 +373,59 @@ function PlanForm({
                       </button>
                     );
                   })}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdding("activity");
+                      setNewLabel("");
+                    }}
+                    className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 transition-colors"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
             );
           })}
         </div>
+
+        {/* Inline add topic form */}
+        {adding && (
+          <div className="flex items-center gap-2 mt-3 p-3 border border-dashed border-gray-300 rounded-lg">
+            <input
+              type="text"
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              placeholder={
+                adding === "gym_type"
+                  ? "New workout type name..."
+                  : "New activity name..."
+              }
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddTopic();
+                }
+              }}
+              className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={handleAddTopic}
+              className="px-3 py-1 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              Add
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdding(null)}
+              className="px-3 py-1 text-gray-500 text-xs"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2">

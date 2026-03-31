@@ -11,8 +11,8 @@ export const DEFAULT_GYM_SCHEDULE: Record<string, GymType> = {
   "1": "psh", // Mon
   "2": "lgh", // Tue
   "3": "rst", // Wed
-  "4": "pll", // Thu
-  "5": "lgl", // Fri
+  "4": "lgl", // Thu
+  "5": "pll", // Fri
   "6": "yga", // Sat
 };
 
@@ -25,8 +25,6 @@ export const DEFAULT_PREP_SCHEDULE: Record<string, ActivityType[]> = {
   "5": ["dte"],          // Fri
   "6": ["sd"],           // Sat
 };
-
-export const WORKOUT_DAYS: GymType[] = ["psh", "lgh", "pll", "lgl", "yga"];
 
 /** Get gym + prep activities for a date, using the active plan or defaults. */
 export function getActivitiesForDate(
@@ -48,7 +46,7 @@ export function getActivitiesForDate(
 export function isWorkoutDay(date: Date, plan?: Plan | null): boolean {
   const gymSchedule = plan?.gym_schedule ?? DEFAULT_GYM_SCHEDULE;
   const gym = gymSchedule[String(date.getDay())] ?? "rst";
-  return WORKOUT_DAYS.includes(gym);
+  return gym !== "rst";
 }
 
 /** Get the gym type key for this date. */
@@ -58,6 +56,12 @@ export function getGymType(date: Date, plan?: Plan | null): GymType {
 }
 
 /** Human-readable gym label for this date. */
-export function getGymLabel(date: Date, plan?: Plan | null): string {
-  return ACTIVITY_LABELS[getGymType(date, plan)];
+export function getGymLabel(
+  date: Date,
+  plan?: Plan | null,
+  labels?: Record<string, string>
+): string {
+  const gymType = getGymType(date, plan);
+  const merged = labels ? { ...ACTIVITY_LABELS, ...labels } : ACTIVITY_LABELS;
+  return merged[gymType] ?? gymType;
 }
