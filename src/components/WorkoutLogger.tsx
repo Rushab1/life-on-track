@@ -274,7 +274,6 @@ function ExerciseAccordion({
   onUpdate: (id: string, entry: Partial<{ reps: number | null; weight_lbs: number | null; duration_mins: number | null }>) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
 }) {
-  const [showPending, setShowPending] = useState(false);
   const setCount = loggedSets.length;
   const histSummary = historySets.length > 0 ? `${historySets.length} sets` : "";
   const prefill = historySets[historySets.length - 1];
@@ -326,30 +325,17 @@ function ExerciseAccordion({
             />
           ))}
 
-          {/* Pending new set row */}
-          {showPending && (
-            <SetRow
-              key="pending"
-              index={setCount}
-              prefill={prefill}
-              onSave={async (r, w, d) => {
-                await onLog({ exercise, sets: null, reps: r, weight_lbs: w, duration_mins: d });
-              }}
-              onUpdate={async () => {}}
-              onRemove={() => setShowPending(false)}
-            />
-          )}
-
-          {/* + Add set button */}
-          {!showPending && (
-            <button
-              onClick={() => setShowPending(true)}
-              className="ml-1 mt-1 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 transition-colors"
-            >
-              <span className="w-5 h-5 rounded-full border border-gray-300 flex items-center justify-center text-base leading-none hover:border-gray-500">+</span>
-              Add set
-            </button>
-          )}
+          {/* Pending new set row — always shown, remounts fresh after each save via key */}
+          <SetRow
+            key={`pending-${setCount}`}
+            index={setCount}
+            prefill={prefill}
+            onSave={async (r, w, d) => {
+              await onLog({ exercise, sets: null, reps: r, weight_lbs: w, duration_mins: d });
+            }}
+            onUpdate={async () => {}}
+            onRemove={() => {}}
+          />
 
           {/* History preview */}
           {historySets.length > 0 && (
