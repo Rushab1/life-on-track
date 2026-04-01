@@ -69,3 +69,16 @@ create table mcp_tokens (
 
 alter table mcp_tokens enable row level security;
 create policy "own tokens" on mcp_tokens for all using (auth.uid() = user_id);
+
+create table custom_topics (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users not null,
+  category text not null check (category in ('exercise', 'activity', 'gym_type')),
+  code text not null,
+  label text not null,
+  created_at timestamptz default now(),
+  unique(user_id, category, code)
+);
+
+alter table custom_topics enable row level security;
+create policy "own data" on custom_topics for all using (auth.uid() = user_id);

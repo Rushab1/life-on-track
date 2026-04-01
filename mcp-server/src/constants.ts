@@ -19,31 +19,37 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
 };
 
 export const EXERCISES = [
-  "Bench Press",
-  "Incline Press",
-  "Shoulder Press",
-  "Lateral Raise",
-  "Tricep Pushdown",
-  "Squat",
-  "Leg Press",
-  "Romanian Deadlift",
-  "Leg Curl",
-  "Leg Extension",
-  "Calf Raise",
-  "Single Arm Row",
-  "Pull-up",
-  "Cable Row",
-  "Face Pull",
-  "Bicep Curl",
-  "Preacher Hammer Curl",
+  // Push
+  "Incline Dumbbell Press",
+  "Overhead Dumbbell Press",
+  "Cable Pec Flies",
+  "Lateral Raises",
+  "Tricep Exercise",
+  // Legs Heavy
+  "Dumbbell Squats",
+  "RDLs",
+  "Wrist Curls",
+  "Leg Raises",
+  // Pull
+  "Dumbbell Rows",
+  "Pull-ups",
+  "Seated Cable Row",
+  "Bicep Exercise",
+  // Legs Light
+  "Lunges",
+  "Leg Extensions",
+  "Leg Curls",
+  "Single Leg Bridges",
+  // Shared
+  "Calf Raises",
   "Other",
 ] as const;
 
 export const WORKOUT_EXERCISES: Record<GymType, string[]> = {
-  psh: ["Bench Press", "Incline Press", "Shoulder Press", "Lateral Raise", "Tricep Pushdown"],
-  lgh: ["Squat", "Leg Press", "Romanian Deadlift", "Leg Curl", "Leg Extension", "Calf Raise"],
-  pll: ["Single Arm Row", "Pull-up", "Bicep Curl", "Cable Row", "Preacher Hammer Curl", "Face Pull"],
-  lgl: ["Squat", "Leg Press", "Leg Curl", "Leg Extension", "Calf Raise"],
+  psh: ["Incline Dumbbell Press", "Overhead Dumbbell Press", "Cable Pec Flies", "Lateral Raises", "Tricep Exercise"],
+  lgh: ["Dumbbell Squats", "RDLs", "Calf Raises", "Wrist Curls", "Leg Raises", "Single Leg Bridges"],
+  pll: ["Dumbbell Rows", "Pull-ups", "Seated Cable Row", "Bicep Exercise", "Wrist Curls"],
+  lgl: ["Lunges", "Leg Extensions", "Leg Curls", "Calf Raises"],
   yga: [],
   rst: [],
 };
@@ -53,8 +59,8 @@ export const DEFAULT_GYM_SCHEDULE: Record<string, GymType> = {
   "1": "psh",
   "2": "lgh",
   "3": "rst",
-  "4": "pll",
-  "5": "lgl",
+  "4": "lgl",
+  "5": "pll",
   "6": "yga",
 };
 
@@ -68,8 +74,6 @@ export const DEFAULT_PREP_SCHEDULE: Record<string, ActivityType[]> = {
   "6": ["sd"],
 };
 
-export const WORKOUT_DAYS: GymType[] = ["psh", "lgh", "pll", "lgl", "yga"];
-
 export function getActivitiesForDate(date: Date, plan?: Plan | null): ActivityType[] {
   const day = String(date.getDay());
   const gymSchedule = plan?.gym_schedule ?? DEFAULT_GYM_SCHEDULE;
@@ -82,7 +86,7 @@ export function getActivitiesForDate(date: Date, plan?: Plan | null): ActivityTy
 export function isWorkoutDay(date: Date, plan?: Plan | null): boolean {
   const gymSchedule = plan?.gym_schedule ?? DEFAULT_GYM_SCHEDULE;
   const gym = gymSchedule[String(date.getDay())] ?? "rst";
-  return WORKOUT_DAYS.includes(gym as GymType);
+  return gym !== "rst";
 }
 
 export function getGymType(date: Date, plan?: Plan | null): GymType {

@@ -40,10 +40,22 @@ export function useWorkoutSets(userId: string, dateStr: string) {
     setLoading(false);
   }
 
+  async function update(
+    id: string,
+    entry: Partial<{
+      reps: number | null;
+      weight_lbs: number | null;
+      duration_mins: number | null;
+    }>
+  ) {
+    await supabase.from("workout_sets").update(entry).eq("id", id);
+    await load();
+  }
+
   async function remove(id: string) {
     await supabase.from("workout_sets").delete().eq("id", id);
     setSets((prev) => prev.filter((s) => s.id !== id));
   }
 
-  return { sets, loading, add, remove };
+  return { sets, loading, add, update, remove };
 }

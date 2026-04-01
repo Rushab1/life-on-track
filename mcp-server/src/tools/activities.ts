@@ -4,10 +4,11 @@ import { getClient } from "../auth.js";
 import { ACTIVITY_LABELS, getActivitiesForDate } from "../constants.js";
 import type { ActivityType, ActivityCompletion } from "../types.js";
 
-const ACTIVITY_TYPES = [
+// Built-in activity types; custom topics are also supported
+const BUILT_IN_ACTIVITY_TYPES = [
   "lc", "ml", "sd", "beh", "oss", "vln", "dte", "mck", "out",
   "psh", "lgh", "rst", "pll", "lgl", "yga",
-] as const;
+];
 
 export function registerActivityTools(server: McpServer) {
   server.tool(
@@ -67,7 +68,7 @@ export function registerActivityTools(server: McpServer) {
     "Toggle an activity's completion status for a date",
     {
       date: z.string().describe("Date in YYYY-MM-DD format"),
-      activity_type: z.enum(ACTIVITY_TYPES).describe("Activity type code"),
+      activity_type: z.string().describe("Activity type code"),
     },
     async ({ date, activity_type }) => {
       const client = getClient();
@@ -115,7 +116,7 @@ export function registerActivityTools(server: McpServer) {
     "Mark multiple activities as completed for a date",
     {
       date: z.string().describe("Date in YYYY-MM-DD format"),
-      activity_types: z.array(z.enum(ACTIVITY_TYPES)).describe("Activity type codes to mark complete"),
+      activity_types: z.array(z.string()).describe("Activity type codes to mark complete"),
     },
     async ({ date, activity_types }) => {
       const client = getClient();
@@ -154,7 +155,7 @@ export function registerActivityTools(server: McpServer) {
     "Add or update a note on an activity for a date",
     {
       date: z.string().describe("Date in YYYY-MM-DD format"),
-      activity_type: z.enum(ACTIVITY_TYPES).describe("Activity type code"),
+      activity_type: z.string().describe("Activity type code"),
       note: z.string().describe("Note text"),
     },
     async ({ date, activity_type, note }) => {

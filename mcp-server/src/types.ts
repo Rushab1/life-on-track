@@ -12,7 +12,7 @@ export interface ActivityCompletion {
   id: string;
   user_id: string;
   date: string;
-  activity_type: ActivityType;
+  activity_type: string;
   completed: boolean;
   notes: string | null;
   created_at: string;
@@ -31,24 +31,9 @@ export interface WorkoutSet {
   created_at: string;
 }
 
-export type ActivityType =
-  | "lc"
-  | "ml"
-  | "sd"
-  | "beh"
-  | "oss"
-  | "vln"
-  | "dte"
-  | "mck"
-  | "out"
-  | "psh"
-  | "lgh"
-  | "rst"
-  | "pll"
-  | "lgl"
-  | "yga";
-
-export type GymType = "psh" | "lgh" | "rst" | "pll" | "lgl" | "yga";
+// Widened to string to support user-defined custom topics
+export type ActivityType = string;
+export type GymType = string;
 
 export interface Plan {
   id: string;
@@ -60,4 +45,13 @@ export interface Plan {
   prep_schedule: Record<string, ActivityType[]>;
   created_at: string;
   updated_at: string;
+}
+
+export interface CustomTopic {
+  id: string;
+  user_id: string;
+  category: "exercise" | "activity" | "gym_type";
+  code: string;
+  label: string;
+  created_at: string;
 }
