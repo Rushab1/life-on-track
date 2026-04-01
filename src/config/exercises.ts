@@ -12,7 +12,7 @@ export const EXERCISES = [
   "Leg Curl",
   "Leg Extension",
   "Calf Raise",
-  "Deadlift",
+  "Single Arm Row",
   "Pull-up",
   "Barbell Row",
   "Cable Row",
@@ -25,7 +25,7 @@ export const EXERCISES = [
 export const WORKOUT_EXERCISES: Record<GymType, string[]> = {
   psh: ["Bench Press", "Incline Press", "Shoulder Press", "Lateral Raise", "Tricep Pushdown"],
   lgh: ["Squat", "Leg Press", "Romanian Deadlift", "Leg Curl", "Leg Extension", "Calf Raise"],
-  pll: ["Deadlift", "Pull-up", "Barbell Row", "Cable Row", "Lat Pulldown", "Bicep Curl"],
+  pll: ["Single Arm Row", "Pull-up", "Barbell Row", "Cable Row", "Lat Pulldown", "Bicep Curl"],
   lgl: ["Squat", "Leg Press", "Leg Curl", "Leg Extension", "Calf Raise"],
   yga: [],
   rst: [],
