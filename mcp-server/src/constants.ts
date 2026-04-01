@@ -35,14 +35,14 @@ export const EXERCISES = [
   "Cable Row",
   "Face Pull",
   "Bicep Curl",
-  "Hammer Curl",
+  "Preacher Hammer Curl",
   "Other",
 ] as const;
 
 export const WORKOUT_EXERCISES: Record<GymType, string[]> = {
   psh: ["Bench Press", "Incline Press", "Shoulder Press", "Lateral Raise", "Tricep Pushdown"],
   lgh: ["Squat", "Leg Press", "Romanian Deadlift", "Leg Curl", "Leg Extension", "Calf Raise"],
-  pll: ["Single Arm Row", "Pull-up", "Cable Row", "Face Pull", "Bicep Curl", "Hammer Curl"],
+  pll: ["Single Arm Row", "Pull-up", "Cable Row", "Face Pull", "Bicep Curl", "Preacher Hammer Curl"],
   lgl: ["Squat", "Leg Press", "Leg Curl", "Leg Extension", "Calf Raise"],
   yga: [],
   rst: [],
