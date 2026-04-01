@@ -57,5 +57,15 @@ export function useWorkoutSets(userId: string, dateStr: string) {
     setSets((prev) => prev.filter((s) => s.id !== id));
   }
 
-  return { sets, loading, add, update, remove };
+  async function removeAllByExercise(exercise: string) {
+    await supabase
+      .from("workout_sets")
+      .delete()
+      .eq("user_id", userId)
+      .eq("date", dateStr)
+      .eq("exercise", exercise);
+    setSets((prev) => prev.filter((s) => s.exercise !== exercise));
+  }
+
+  return { sets, loading, add, update, remove, removeAllByExercise };
 }

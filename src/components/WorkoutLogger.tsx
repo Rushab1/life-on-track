@@ -32,7 +32,7 @@ export default function WorkoutLogger({
   const gymType = getGymType(date, plan);
   const defaultExercises = workoutExercises[gymType] ?? [];
   const meta = WORKOUT_META[gymType] ?? { warmup: [], cardio: [] };
-  const { sets: loggedSets, add, update, remove } = useWorkoutSets(userId, dateStr);
+  const { sets: loggedSets, add, update, remove, removeAllByExercise } = useWorkoutSets(userId, dateStr);
   const allExercisesForHistory = [...meta.warmup, ...defaultExercises, ...meta.cardio];
   const lastSets = useLastWorkout(userId, dateStr, allExercisesForHistory);
 
@@ -78,6 +78,7 @@ export default function WorkoutLogger({
         onLog={add}
         onUpdate={update}
         onRemove={remove}
+        onRemoveAll={() => removeAllByExercise(exercise)}
       />
     ));
   }
@@ -164,6 +165,7 @@ export default function WorkoutLogger({
               onLog={add}
               onUpdate={update}
               onRemove={remove}
+              onRemoveAll={() => removeAllByExercise(extraExercise)}
             />
           </div>
         )}
@@ -171,6 +173,24 @@ export default function WorkoutLogger({
     </div>
   );
 }
+
+// Convert decimal minutes to [min, sec] strings for display
+function minsToMinSec(mins: number | null): [string, string] {
+  if (mins === null) return ["", ""];
+  const m = Math.floor(mins);
+  const s = Math.round((mins - m) * 60);
+  return [m > 0 ? String(m) : "", s > 0 ? String(s) : ""];
+}
+
+// Convert min + sec strings to decimal minutes for storage
+function minSecToMins(min: string, sec: string): number | null {
+  const m = min ? Number(min) : 0;
+  const s = sec ? Number(sec) : 0;
+  if (m === 0 && s === 0) return null;
+  return m + s / 60;
+}
+
+const numInputClass = "px-2 py-1 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder-gray-300 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
 /** A single editable set row — saved or pending. */
 function SetRow({
@@ -188,62 +208,85 @@ function SetRow({
   onUpdate: (reps: number | null, weight: number | null, duration: number | null) => Promise<void>;
   onRemove: () => void;
 }) {
+  const [prefillDurMin, prefillDurSec] = minsToMinSec(prefill?.duration_mins ?? null);
+  const [savedDurMin, savedDurSec] = minsToMinSec(savedSet?.duration_mins ?? null);
+
   const [reps, setReps] = useState(savedSet?.reps?.toString() ?? "");
   const [weight, setWeight] = useState(savedSet?.weight_lbs?.toString() ?? "");
-  const [duration, setDuration] = useState(savedSet?.duration_mins?.toString() ?? "");
+  const [durMin, setDurMin] = useState(savedDurMin);
+  const [durSec, setDurSec] = useState(savedDurSec);
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   async function handleBlur() {
     const r = reps ? Number(reps) : null;
     const w = weight ? Number(weight) : null;
-    const d = duration ? Number(duration) : null;
+    const d = minSecToMins(durMin, durSec);
     if (r === null && w === null && d === null) return;
     setSaving(true);
     if (savedSet) {
       await onUpdate(r, w, d);
     } else {
       await onSave(r, w, d);
-      setReps(""); setWeight(""); setDuration("");
+      setReps(""); setWeight(""); setDurMin(""); setDurSec("");
     }
     setSaving(false);
   }
 
-  const repsPlaceholder = savedSet ? undefined : (prefill?.reps?.toString() ?? "Reps");
-  const weightPlaceholder = savedSet ? undefined : (prefill?.weight_lbs?.toString() ?? "lbs");
-  const durationPlaceholder = savedSet ? undefined : (prefill?.duration_mins?.toString() ?? "min");
+  const isPending = !savedSet;
 
   return (
-    <div className={`flex items-center gap-1.5 px-1 py-0.5 rounded-lg ${savedSet ? "bg-green-50" : ""}`}>
-      <span className="text-xs text-gray-400 w-8 flex-shrink-0 text-center">{index + 1}</span>
+    <div className={`flex items-center gap-1 px-1 py-0.5 rounded-lg ${savedSet ? "bg-green-50" : ""}`}>
+      <span className="text-xs text-gray-400 w-6 flex-shrink-0 text-center">{index + 1}</span>
       <input
-        type="number"
-        placeholder={repsPlaceholder}
+        type="text" inputMode="numeric" pattern="[0-9]*"
+        placeholder={isPending ? (prefill?.reps?.toString() ?? "reps") : undefined}
         value={reps}
         onChange={(e) => setReps(e.target.value)}
         onBlur={handleBlur}
-        className="flex-1 px-2 py-1 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder-gray-300 bg-transparent"
+        className={`flex-1 min-w-0 ${numInputClass}`}
       />
-      <span className="text-xs text-gray-300">@</span>
+      <span className="text-xs text-gray-300 flex-shrink-0">@</span>
       <input
-        type="number"
-        placeholder={weightPlaceholder}
+        type="text" inputMode="decimal" pattern="[0-9.]*"
+        placeholder={isPending ? (prefill?.weight_lbs?.toString() ?? "lbs") : undefined}
         value={weight}
         onChange={(e) => setWeight(e.target.value)}
         onBlur={handleBlur}
-        className="flex-1 px-2 py-1 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder-gray-300 bg-transparent"
+        className={`flex-1 min-w-0 ${numInputClass}`}
       />
+      {/* Duration: min : sec */}
       <input
-        type="number"
-        placeholder={durationPlaceholder}
-        value={duration}
-        onChange={(e) => setDuration(e.target.value)}
+        type="text" inputMode="numeric" pattern="[0-9]*"
+        placeholder={isPending ? (prefillDurMin || "m") : undefined}
+        value={durMin}
+        onChange={(e) => setDurMin(e.target.value)}
         onBlur={handleBlur}
-        className="w-14 px-2 py-1 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder-gray-300 bg-transparent"
+        className={`w-8 flex-shrink-0 ${numInputClass}`}
       />
-      {saving
-        ? <span className="text-[10px] text-gray-400 w-5">…</span>
-        : <button onClick={onRemove} className="text-gray-300 hover:text-red-400 text-base leading-none w-5 text-center flex-shrink-0">&times;</button>
-      }
+      <span className="text-xs text-gray-300 flex-shrink-0">:</span>
+      <input
+        type="text" inputMode="numeric" pattern="[0-9]*"
+        placeholder={isPending ? (prefillDurSec || "s") : undefined}
+        value={durSec}
+        onChange={(e) => setDurSec(e.target.value)}
+        onBlur={handleBlur}
+        className={`w-8 flex-shrink-0 ${numInputClass}`}
+      />
+      {/* Delete / confirm */}
+      {saving ? (
+        <span className="text-[10px] text-gray-400 w-8 flex-shrink-0">…</span>
+      ) : confirmDelete ? (
+        <div className="flex items-center gap-0.5 flex-shrink-0">
+          <button onClick={onRemove} className="text-[10px] text-red-500 font-medium">Del</button>
+          <button onClick={() => setConfirmDelete(false)} className="text-[10px] text-gray-400">✕</button>
+        </div>
+      ) : (
+        <button
+          onClick={() => savedSet ? setConfirmDelete(true) : onRemove()}
+          className="text-gray-400 hover:text-red-500 text-base leading-none w-5 text-center flex-shrink-0"
+        >&times;</button>
+      )}
     </div>
   );
 }
@@ -258,6 +301,7 @@ function ExerciseAccordion({
   onLog,
   onUpdate,
   onRemove,
+  onRemoveAll,
 }: {
   exercise: string;
   isOpen: boolean;
@@ -273,7 +317,9 @@ function ExerciseAccordion({
   }) => Promise<void>;
   onUpdate: (id: string, entry: Partial<{ reps: number | null; weight_lbs: number | null; duration_mins: number | null }>) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
+  onRemoveAll: () => void;
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const setCount = loggedSets.length;
   const histSummary = historySets.length > 0 ? `${historySets.length} sets` : "";
   const prefill = historySets[historySets.length - 1];
@@ -296,20 +342,49 @@ function ExerciseAccordion({
             <span className="text-[10px] bg-gray-900 text-white px-1.5 py-0.5 rounded-full">{setCount}</span>
           )}
         </div>
-        {!isOpen && histSummary && (
-          <span className="text-[10px] text-gray-400">last: {histSummary}</span>
-        )}
+        <div className="flex items-center gap-2">
+          {!isOpen && histSummary && (
+            <span className="text-[10px] text-gray-400">last: {histSummary}</span>
+          )}
+          {setCount > 0 && (
+            confirmDelete ? (
+              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={() => { onRemoveAll(); setConfirmDelete(false); }}
+                  className="text-[10px] text-red-500 font-medium"
+                >
+                  Delete all
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="text-[10px] text-gray-400"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
+                className="text-[10px] text-gray-300 hover:text-red-400 transition-colors"
+              >
+                Delete
+              </button>
+            )
+          )}
+        </div>
       </button>
 
       {isOpen && (
         <div className="px-2 pb-3 space-y-1">
           {/* Column headers */}
-          <div className="flex items-center gap-1.5 px-1 pb-0.5">
-            <span className="w-8" />
+          <div className="flex items-center gap-1 px-1 pb-0.5">
+            <span className="w-6" />
             <span className="flex-1 text-[10px] text-gray-400 text-center">reps</span>
             <span className="w-3" />
             <span className="flex-1 text-[10px] text-gray-400 text-center">lbs</span>
-            <span className="w-14 text-[10px] text-gray-400 text-center">min</span>
+            <span className="w-8 text-[10px] text-gray-400 text-center">min</span>
+            <span className="w-3" />
+            <span className="w-8 text-[10px] text-gray-400 text-center">sec</span>
             <span className="w-5" />
           </div>
 
