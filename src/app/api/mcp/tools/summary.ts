@@ -7,7 +7,7 @@ import type { ActivityCompletion, WorkoutSet, DailyLog } from "@/lib/types";
 export function registerSummaryTools(server: McpServer, client: SupabaseClient, userId: string) {
   server.tool(
     "get_day_summary",
-    "Get a full summary of a day: pain level, activities, workout sets, and active plan",
+    "Get a full summary of a single day: pain level (0-10), all activity completions, all workout sets, and which plan is active. This is the best starting tool — call it first to understand the user's day before making changes.",
     { date: z.string().describe("Date in YYYY-MM-DD format") },
     async ({ date }) => {
       const [dailyLogRes, activitiesRes, workoutsRes, planRes] = await Promise.all([
@@ -41,7 +41,7 @@ export function registerSummaryTools(server: McpServer, client: SupabaseClient, 
 
   server.tool(
     "get_week_summary",
-    "Get an aggregated summary for a date range (defaults to past 7 days)",
+    "Get an aggregated summary for a date range (defaults to past 7 days). Returns average pain level, activity completion rates by type, number of workout days, and total exercises logged.",
     {
       start_date: z.string().optional().describe("Start date YYYY-MM-DD (defaults to 7 days ago)"),
       end_date: z.string().optional().describe("End date YYYY-MM-DD (defaults to today)"),

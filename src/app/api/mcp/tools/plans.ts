@@ -8,7 +8,7 @@ import type { Plan } from "@/lib/types";
 export function registerPlanTools(server: McpServer, client: SupabaseClient, userId: string) {
   server.tool(
     "get_plans",
-    "List all plans, ordered by start date (newest first)",
+    "List all plans, ordered by start date (newest first). Plans define the weekly gym and prep schedule for a date range. They do NOT auto-create activity completions — activities are tracked independently. If two plans overlap, the first match by start_date is used. If no plan covers a date, hardcoded defaults apply.",
     {},
     async () => {
       const { data, error } = await client
@@ -27,7 +27,7 @@ export function registerPlanTools(server: McpServer, client: SupabaseClient, use
 
   server.tool(
     "get_active_plan",
-    "Get the plan that covers a specific date",
+    "Get the plan that covers a specific date. Returns the plan's gym_schedule and prep_schedule, or falls back to defaults if no plan covers the date. Use this to find out what workout type and prep activities are scheduled.",
     { date: z.string().describe("Date in YYYY-MM-DD format") },
     async ({ date }) => {
       const { data, error } = await client
@@ -62,13 +62,16 @@ export function registerPlanTools(server: McpServer, client: SupabaseClient, use
 
   server.tool(
     "create_plan",
-    "Create a new plan with gym and prep schedules",
+    `Create a new plan with gym and prep schedules. Plans define what workout and prep activities are scheduled each day of the week for a date range. Creating a plan does NOT auto-populate activity completions — it only sets the schedule. Omitted schedules default to the hardcoded schedule.
+
+Example gym_schedule: {"0":"rst","1":"psh","2":"lgh","3":"rst","4":"lgl","5":"pll","6":"yga"}
+Example prep_schedule: {"0":["oss"],"1":["vln","lc"],"2":["ml"],"3":["ml","lc"],"4":["lc"],"5":["dte"],"6":["sd"]}`,
     {
       name: z.string().describe("Plan name"),
       start_date: z.string().describe("Start date YYYY-MM-DD"),
       end_date: z.string().describe("End date YYYY-MM-DD"),
-      gym_schedule: z.record(z.string(), z.string()).optional().describe("Day-of-week (0-6) to gym type mapping"),
-      prep_schedule: z.record(z.string(), z.array(z.string())).optional().describe("Day-of-week (0-6) to activity type array"),
+      gym_schedule: z.record(z.string(), z.string()).optional().describe("Day-of-week to gym type. Keys are '0'-'6' where 0=Sunday, 6=Saturday. Values: psh (Push), pll (Pull), lgh (Legs Heavy), lgl (Legs Light), yga (Yoga), rst (Rest). Omit to use defaults."),
+      prep_schedule: z.record(z.string(), z.array(z.string())).optional().describe("Day-of-week to prep activity arrays. Keys are '0'-'6' (0=Sunday). Values are arrays of activity codes: lc (LeetCode), ml (ML/AI), sd (System Design), beh (Behavioral), oss (FastMCP), vln (Violin), dte (Date Night), mck (Mock Interview), out (Outdoor Activity). Omit to use defaults."),
     },
     async ({ name, start_date, end_date, gym_schedule, prep_schedule }) => {
       const { error } = await client.from("plans").insert({
@@ -86,11 +89,12 @@ export function registerPlanTools(server: McpServer, client: SupabaseClient, use
     "update_plan",
     "Update an existing plan",
     {
-      id: z.string().describe("Plan ID"),
-      name: z.string().optional(), start_date: z.string().optional(),
-      end_date: z.string().optional(),
-      gym_schedule: z.record(z.string(), z.string()).optional(),
-      prep_schedule: z.record(z.string(), z.array(z.string())).optional(),
+      id: z.string().describe("Plan ID (UUID from get_plans)"),
+      name: z.string().optional().describe("New plan name"),
+      start_date: z.string().optional().describe("New start date YYYY-MM-DD"),
+      end_date: z.string().optional().describe("New end date YYYY-MM-DD"),
+      gym_schedule: z.record(z.string(), z.string()).optional().describe("Updated gym schedule. Same format as create_plan: keys '0'-'6' (0=Sunday), values are gym type codes."),
+      prep_schedule: z.record(z.string(), z.array(z.string())).optional().describe("Updated prep schedule. Same format as create_plan."),
     },
     async ({ id, ...updates }) => {
       const cleanUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() };

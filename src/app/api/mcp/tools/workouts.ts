@@ -6,7 +6,7 @@ import type { WorkoutSet } from "@/lib/types";
 export function registerWorkoutTools(server: McpServer, client: SupabaseClient, userId: string) {
   server.tool(
     "get_workout_sets",
-    "Get all workout sets logged for a date",
+    "Get all workout sets logged for a date. Each row is one set of one exercise (not grouped). Returns id, exercise name, reps, weight_lbs, duration_mins, and notes.",
     { date: z.string().describe("Date in YYYY-MM-DD format") },
     async ({ date }) => {
       const { data, error } = await client
@@ -30,11 +30,11 @@ export function registerWorkoutTools(server: McpServer, client: SupabaseClient, 
     "Log a single exercise set",
     {
       date: z.string().describe("Date in YYYY-MM-DD format"),
-      exercise: z.string().describe("Exercise name"),
-      reps: z.number().optional().describe("Reps"),
-      weight_lbs: z.number().optional().describe("Weight in pounds"),
-      duration_mins: z.number().optional().describe("Duration in minutes"),
-      notes: z.string().optional().describe("Notes"),
+      exercise: z.string().describe("Exercise name, e.g. 'Incline Dumbbell Press', 'RDLs', 'Pull-ups', 'Run'. Free text — any string is valid."),
+      reps: z.number().optional().describe("Reps for this set"),
+      weight_lbs: z.number().optional().describe("Weight in pounds for this set"),
+      duration_mins: z.number().optional().describe("Duration in decimal minutes (e.g. 0.5 = 30 seconds, 1.5 = 1 min 30 sec). Used for static holds and cardio."),
+      notes: z.string().optional().describe("Notes for this set"),
     },
     async ({ date, exercise, reps, weight_lbs, duration_mins, notes }) => {
       const { error } = await client.from("workout_sets").insert({
@@ -85,8 +85,8 @@ export function registerWorkoutTools(server: McpServer, client: SupabaseClient, 
 
   server.tool(
     "delete_workout_set",
-    "Delete a logged workout set by ID",
-    { id: z.string().describe("The workout set ID to delete") },
+    "Delete a logged workout set by ID. Get the ID from get_workout_sets.",
+    { id: z.string().describe("The workout set UUID (from get_workout_sets response)") },
     async ({ id }) => {
       const { error } = await client.from("workout_sets").delete().eq("user_id", userId).eq("id", id);
       if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
@@ -96,7 +96,7 @@ export function registerWorkoutTools(server: McpServer, client: SupabaseClient, 
 
   server.tool(
     "get_last_workout",
-    "Get the most recent workout sets for given exercises (before a date), useful for progressive overload",
+    "Get the most recent workout sets for given exercises before a date. Useful for progressive overload — shows what weight/reps were used last time. Groups by exercise, returns only the most recent session per exercise.",
     {
       date: z.string().describe("Date in YYYY-MM-DD — look for sessions before this date"),
       exercises: z.array(z.string()).describe("Exercise names to look up"),

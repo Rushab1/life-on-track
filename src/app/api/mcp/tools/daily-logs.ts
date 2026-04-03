@@ -32,7 +32,7 @@ export function registerDailyLogTools(server: McpServer, client: SupabaseClient,
 
   server.tool(
     "save_daily_log",
-    "Save or update pain level and/or notes for a date",
+    "Save or update pain level and/or notes for a date. Upserts — safe to call repeatedly. Only provided fields are updated; omitted fields are left unchanged.",
     {
       date: z.string().describe("Date in YYYY-MM-DD format"),
       pain_level: z.number().min(0).max(10).optional().describe("Pain level 0-10"),

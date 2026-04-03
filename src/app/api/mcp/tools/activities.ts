@@ -8,7 +8,7 @@ import type { ActivityCompletion } from "@/lib/types";
 export function registerActivityTools(server: McpServer, client: SupabaseClient, userId: string) {
   server.tool(
     "get_activities",
-    "Get activity completions for a date, including what's scheduled",
+    "Get activity completions for a date, including what's scheduled by the plan. Returns both scheduled and ad-hoc activities with their completion status. Activities are independent of plans — plans define the schedule, but completions are tracked separately.",
     { date: z.string().describe("Date in YYYY-MM-DD format") },
     async ({ date }) => {
       const { data, error } = await client
@@ -53,7 +53,7 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
     "Toggle an activity's completion status for a date",
     {
       date: z.string().describe("Date in YYYY-MM-DD format"),
-      activity_type: z.string().describe("Activity type code"),
+      activity_type: z.string().describe("Activity type code. Gym types: psh (Push), pll (Pull), lgh (Legs Heavy), lgl (Legs Light), yga (Yoga), rst (Rest). Prep activities: lc (LeetCode), ml (ML/AI), sd (System Design), beh (Behavioral), oss (FastMCP), vln (Violin), dte (Date Night), mck (Mock Interview), out (Outdoor Activity). Users can also create custom codes."),
     },
     async ({ date, activity_type }) => {
       const { data: existing } = await client
@@ -83,7 +83,7 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
     "Mark multiple activities as completed for a date",
     {
       date: z.string().describe("Date in YYYY-MM-DD format"),
-      activity_types: z.array(z.string()).describe("Activity type codes to mark complete"),
+      activity_types: z.array(z.string()).describe("Activity type codes to mark complete. See toggle_activity for valid codes."),
     },
     async ({ date, activity_types }) => {
       const rows = activity_types.map((at) => ({
@@ -106,7 +106,7 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
     "Add or update a note on an activity for a date",
     {
       date: z.string().describe("Date in YYYY-MM-DD format"),
-      activity_type: z.string().describe("Activity type code"),
+      activity_type: z.string().describe("Activity type code. See toggle_activity for valid codes."),
       note: z.string().describe("Note text"),
     },
     async ({ date, activity_type, note }) => {
