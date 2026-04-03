@@ -44,7 +44,13 @@ async function handleMcpRequest(req: Request): Promise<Response> {
 
   await server.connect(transport);
 
-  return transport.handleRequest(req);
+  const response = await transport.handleRequest(req);
+
+  // Close transport so the serverless function can terminate
+  await transport.close();
+  await server.close();
+
+  return response;
 }
 
 export async function POST(req: Request): Promise<Response> {

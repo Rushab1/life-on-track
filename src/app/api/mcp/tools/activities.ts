@@ -132,18 +132,15 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
       activity_type: z.string().describe("Activity type code to delete. See toggle_activity for valid codes."),
     },
     async ({ date, activity_type }) => {
-      const { error, count } = await client
+      const { error } = await client
         .from("activity_completions")
-        .delete({ count: "exact" })
+        .delete()
         .eq("user_id", userId)
         .eq("date", date)
         .eq("activity_type", activity_type);
 
       if (error) {
         return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
-      }
-      if (count === 0) {
-        return { content: [{ type: "text" as const, text: `No ${activity_type} completion found for ${date}.` }] };
       }
       const label = ACTIVITY_LABELS[activity_type] ?? activity_type;
       return { content: [{ type: "text" as const, text: `Deleted ${label} completion for ${date}.` }] };
@@ -158,9 +155,9 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
       exercise: z.string().describe("Exercise name to delete all sets for"),
     },
     async ({ date, exercise }) => {
-      const { error, count } = await client
+      const { error } = await client
         .from("workout_sets")
-        .delete({ count: "exact" })
+        .delete()
         .eq("user_id", userId)
         .eq("date", date)
         .eq("exercise", exercise);
@@ -168,10 +165,7 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
       if (error) {
         return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
       }
-      if (count === 0) {
-        return { content: [{ type: "text" as const, text: `No sets found for ${exercise} on ${date}.` }] };
-      }
-      return { content: [{ type: "text" as const, text: `Deleted ${count} set(s) of ${exercise} for ${date}.` }] };
+      return { content: [{ type: "text" as const, text: `Deleted ${exercise} sets for ${date}.` }] };
     }
   );
 }
