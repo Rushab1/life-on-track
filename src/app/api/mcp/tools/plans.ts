@@ -1,14 +1,12 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ACTIVITY_LABELS } from "@/config/constants";
-import { DEFAULT_GYM_SCHEDULE, DEFAULT_PREP_SCHEDULE } from "@/config/schedule";
 import type { Plan } from "@/lib/types";
 
 export function registerPlanTools(server: McpServer, client: SupabaseClient, userId: string) {
   server.tool(
     "get_plans",
-    "List all plans, ordered by start date (newest first). Plans define the weekly gym and prep schedule for a date range. They do NOT auto-create activity completions — activities are tracked independently. If two plans overlap, the first match by start_date is used. If no plan covers a date, hardcoded defaults apply.",
+    "List all plans, ordered by start date (newest first). Plans define the weekly gym and prep schedule for a date range. They do NOT auto-create activity completions — activities are tracked independently. If two plans overlap, the first match by start_date is used. If no plan covers a date, the day is empty (no scheduled activities or workouts).",
     {},
     async () => {
       const { data, error } = await client
@@ -27,7 +25,7 @@ export function registerPlanTools(server: McpServer, client: SupabaseClient, use
 
   server.tool(
     "get_active_plan",
-    "Get the plan that covers a specific date. Returns the plan's gym_schedule and prep_schedule, or falls back to defaults if no plan covers the date. Use this to find out what workout type and prep activities are scheduled.",
+    "Get the plan that covers a specific date. Returns the plan's gym_schedule and prep_schedule. If no plan covers the date, returns a message saying so — the user needs to create a plan first.",
     { date: z.string().describe("Date in YYYY-MM-DD format") },
     async ({ date }) => {
       const { data, error } = await client
@@ -37,13 +35,10 @@ export function registerPlanTools(server: McpServer, client: SupabaseClient, use
 
       if (error && error.code !== "PGRST116") return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
       if (!data) {
-        const day = String(new Date(date + "T00:00:00").getDay());
-        const gym = DEFAULT_GYM_SCHEDULE[day] ?? "rst";
-        const prep = DEFAULT_PREP_SCHEDULE[day] ?? [];
         return {
           content: [{
             type: "text" as const,
-            text: `No plan covers ${date}. Using defaults:\n  Gym: ${ACTIVITY_LABELS[gym] ?? gym}\n  Prep: ${prep.map((a) => ACTIVITY_LABELS[a] ?? a).join(", ") || "None"}`,
+            text: `No plan covers ${date}. The user needs to create a plan with create_plan to set up their schedule.`,
           }],
         };
       }
@@ -62,7 +57,7 @@ export function registerPlanTools(server: McpServer, client: SupabaseClient, use
 
   server.tool(
     "create_plan",
-    `Create a new plan with gym and prep schedules. Plans define what workout and prep activities are scheduled each day of the week for a date range. Creating a plan does NOT auto-populate activity completions — it only sets the schedule. Omitted schedules default to the hardcoded schedule.
+    `Create a new plan with gym and prep schedules. Plans define what workout and prep activities are scheduled each day of the week for a date range. Creating a plan does NOT auto-populate activity completions — it only sets the schedule. Both gym_schedule and prep_schedule are required.
 
 Example gym_schedule: {"0":"rst","1":"psh","2":"lgh","3":"rst","4":"lgl","5":"pll","6":"yga"}
 Example prep_schedule: {"0":["oss"],"1":["vln","lc"],"2":["ml"],"3":["ml","lc"],"4":["lc"],"5":["dte"],"6":["sd"]}`,
@@ -70,14 +65,14 @@ Example prep_schedule: {"0":["oss"],"1":["vln","lc"],"2":["ml"],"3":["ml","lc"],
       name: z.string().describe("Plan name"),
       start_date: z.string().describe("Start date YYYY-MM-DD"),
       end_date: z.string().describe("End date YYYY-MM-DD"),
-      gym_schedule: z.record(z.string(), z.string()).optional().describe("Day-of-week to gym type. Keys are '0'-'6' where 0=Sunday, 6=Saturday. Values: psh (Push), pll (Pull), lgh (Legs Heavy), lgl (Legs Light), yga (Yoga), rst (Rest). Omit to use defaults."),
-      prep_schedule: z.record(z.string(), z.array(z.string())).optional().describe("Day-of-week to prep activity arrays. Keys are '0'-'6' (0=Sunday). Values are arrays of activity codes: lc (LeetCode), ml (ML/AI), sd (System Design), beh (Behavioral), oss (FastMCP), vln (Violin), dte (Date Night), mck (Mock Interview), out (Outdoor Activity). Omit to use defaults."),
+      gym_schedule: z.record(z.string(), z.string()).describe("Day-of-week to gym type. Keys are '0'-'6' where 0=Sunday, 6=Saturday. Values: psh (Push), pll (Pull), lgh (Legs Heavy), lgl (Legs Light), yga (Yoga), rst (Rest)."),
+      prep_schedule: z.record(z.string(), z.array(z.string())).describe("Day-of-week to prep activity arrays. Keys are '0'-'6' (0=Sunday). Values are arrays of activity codes: lc (LeetCode), ml (ML/AI), sd (System Design), beh (Behavioral), oss (FastMCP), vln (Violin), dte (Date Night), mck (Mock Interview), out (Outdoor Activity)."),
     },
     async ({ name, start_date, end_date, gym_schedule, prep_schedule }) => {
       const { error } = await client.from("plans").insert({
         user_id: userId, name, start_date, end_date,
-        gym_schedule: gym_schedule ?? DEFAULT_GYM_SCHEDULE,
-        prep_schedule: prep_schedule ?? DEFAULT_PREP_SCHEDULE,
+        gym_schedule,
+        prep_schedule,
       });
 
       if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
