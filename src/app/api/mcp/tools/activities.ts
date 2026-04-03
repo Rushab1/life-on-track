@@ -123,4 +123,55 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
       return { content: [{ type: "text" as const, text: `Note saved for ${label} on ${date}: "${note}"` }] };
     }
   );
+
+  server.tool(
+    "delete_activity",
+    "Delete an activity completion for a date. Removes the completion record entirely — the activity will show as not completed if it's still scheduled by the plan. Also works to remove ad-hoc activities that were added outside the plan.",
+    {
+      date: z.string().describe("Date in YYYY-MM-DD format"),
+      activity_type: z.string().describe("Activity type code to delete. See toggle_activity for valid codes."),
+    },
+    async ({ date, activity_type }) => {
+      const { error, count } = await client
+        .from("activity_completions")
+        .delete({ count: "exact" })
+        .eq("user_id", userId)
+        .eq("date", date)
+        .eq("activity_type", activity_type);
+
+      if (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      }
+      if (count === 0) {
+        return { content: [{ type: "text" as const, text: `No ${activity_type} completion found for ${date}.` }] };
+      }
+      const label = ACTIVITY_LABELS[activity_type] ?? activity_type;
+      return { content: [{ type: "text" as const, text: `Deleted ${label} completion for ${date}.` }] };
+    }
+  );
+
+  server.tool(
+    "delete_all_exercises",
+    "Delete ALL workout sets for a specific exercise on a date. Use this to remove an entire exercise from the day's log (e.g. all sets of 'Pull-ups' on 2026-04-03).",
+    {
+      date: z.string().describe("Date in YYYY-MM-DD format"),
+      exercise: z.string().describe("Exercise name to delete all sets for"),
+    },
+    async ({ date, exercise }) => {
+      const { error, count } = await client
+        .from("workout_sets")
+        .delete({ count: "exact" })
+        .eq("user_id", userId)
+        .eq("date", date)
+        .eq("exercise", exercise);
+
+      if (error) {
+        return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      }
+      if (count === 0) {
+        return { content: [{ type: "text" as const, text: `No sets found for ${exercise} on ${date}.` }] };
+      }
+      return { content: [{ type: "text" as const, text: `Deleted ${count} set(s) of ${exercise} for ${date}.` }] };
+    }
+  );
 }
