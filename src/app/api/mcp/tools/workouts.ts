@@ -2,6 +2,74 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { WorkoutSet } from "@/lib/types";
+import { EXERCISES, WORKOUT_META } from "@/config/exercises";
+
+/** Get all known exercise names: built-in + warmup/cardio + custom topics + previously logged. */
+async function getKnownExercises(client: SupabaseClient, userId: string): Promise<string[]> {
+  const builtIn = [
+    ...EXERCISES,
+    ...Object.values(WORKOUT_META).flatMap((m) => [...m.warmup, ...m.cardio]),
+  ];
+
+  const [customRes, historyRes] = await Promise.all([
+    client.from("custom_topics").select("label").eq("user_id", userId).eq("category", "exercise"),
+    client.from("workout_sets").select("exercise").eq("user_id", userId),
+  ]);
+
+  const custom = (customRes.data ?? []).map((r: { label: string }) => r.label);
+  const historical = Array.from(new Set((historyRes.data ?? []).map((r: { exercise: string }) => r.exercise)));
+
+  return Array.from(new Set([...builtIn, ...custom, ...historical]));
+}
+
+/** Find similar exercises by case-insensitive substring matching. */
+function findSimilar(input: string, known: string[]): string[] {
+  const lower = input.toLowerCase();
+  // Exact case-insensitive match
+  const exact = known.find((k) => k.toLowerCase() === lower);
+  if (exact) return [exact];
+
+  // Substring matches — input is part of known name or vice versa
+  const matches = known.filter((k) => {
+    const kl = k.toLowerCase();
+    return kl.includes(lower) || lower.includes(kl);
+  });
+
+  // Word overlap — split both into words and check for shared words
+  if (matches.length === 0) {
+    const inputWords = lower.split(/[\s\-]+/).filter((w) => w.length > 2);
+    return known.filter((k) => {
+      const kWords = k.toLowerCase().split(/[\s\-]+/);
+      return inputWords.some((w) => kWords.some((kw) => kw.includes(w) || w.includes(kw)));
+    });
+  }
+
+  return matches;
+}
+
+/** Validate an exercise name. Returns the matched name or an error message with suggestions. */
+async function validateExercise(
+  exercise: string,
+  client: SupabaseClient,
+  userId: string,
+  known: string[]
+): Promise<{ valid: true; name: string } | { valid: false; message: string }> {
+  // Exact match (case-insensitive)
+  const exactMatch = known.find((k) => k.toLowerCase() === exercise.toLowerCase());
+  if (exactMatch) return { valid: true, name: exactMatch };
+
+  const similar = findSimilar(exercise, known);
+  if (similar.length > 0) {
+    return {
+      valid: false,
+      message: `Unknown exercise "${exercise}". Did you mean: ${similar.map((s) => `"${s}"`).join(", ")}? Use the exact name to log.`,
+    };
+  }
+  return {
+    valid: false,
+    message: `Unknown exercise "${exercise}". No similar exercises found. Known exercises: ${known.slice(0, 20).join(", ")}${known.length > 20 ? "..." : ""}`,
+  };
+}
 
 export function registerWorkoutTools(server: McpServer, client: SupabaseClient, userId: string) {
   server.tool(
@@ -27,24 +95,30 @@ export function registerWorkoutTools(server: McpServer, client: SupabaseClient, 
 
   server.tool(
     "log_workout_set",
-    "Log a single exercise set",
+    "Log a single exercise set. The exercise name must match a known exercise (case-insensitive). If it doesn't match, the tool will reject the request and suggest similar exercises. Call get_workout_sets or get_active_plan first to see valid exercise names.",
     {
       date: z.string().describe("Date in YYYY-MM-DD format"),
-      exercise: z.string().describe("Exercise name, e.g. 'Incline Dumbbell Press', 'RDLs', 'Pull-ups', 'Run'. Free text — any string is valid."),
+      exercise: z.string().describe("Exercise name — must match a known exercise. Examples: 'Incline Dumbbell Press', 'RDLs', 'Pull-ups', 'Lunges', 'Calf Raises', 'Run', 'Incline Walk'."),
       reps: z.number().optional().describe("Reps for this set"),
       weight_lbs: z.number().optional().describe("Weight in pounds for this set"),
       duration_mins: z.number().optional().describe("Duration in decimal minutes (e.g. 0.5 = 30 seconds, 1.5 = 1 min 30 sec). Used for static holds and cardio."),
       notes: z.string().optional().describe("Notes for this set"),
     },
     async ({ date, exercise, reps, weight_lbs, duration_mins, notes }) => {
+      const known = await getKnownExercises(client, userId);
+      const check = await validateExercise(exercise, client, userId, known);
+      if (!check.valid) {
+        return { content: [{ type: "text" as const, text: check.message }] };
+      }
+
       const { error } = await client.from("workout_sets").insert({
-        user_id: userId, date, exercise,
+        user_id: userId, date, exercise: check.name,
         reps: reps ?? null, weight_lbs: weight_lbs ?? null,
         duration_mins: duration_mins ?? null, notes: notes ?? null,
       });
 
       if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
-      let desc = `Logged ${exercise} for ${date}`;
+      let desc = `Logged ${check.name} for ${date}`;
       if (reps) desc += ` — ${reps} reps`;
       if (weight_lbs) desc += ` @ ${weight_lbs} lbs`;
       if (duration_mins) desc += ` for ${duration_mins} min`;
@@ -54,7 +128,7 @@ export function registerWorkoutTools(server: McpServer, client: SupabaseClient, 
 
   server.tool(
     "log_workout",
-    "Log a full workout with multiple exercises at once",
+    "Log a full workout with multiple exercises at once. All exercise names must match known exercises (case-insensitive). If any don't match, the entire request is rejected with suggestions for the unmatched names.",
     {
       date: z.string().describe("Date in YYYY-MM-DD format"),
       exercises: z.array(z.object({
@@ -64,22 +138,40 @@ export function registerWorkoutTools(server: McpServer, client: SupabaseClient, 
       })).describe("Array of exercises to log"),
     },
     async ({ date, exercises }) => {
-      const rows = exercises.map((e) => ({
-        user_id: userId, date, exercise: e.exercise,
-        reps: e.reps ?? null, weight_lbs: e.weight_lbs ?? null,
-        duration_mins: e.duration_mins ?? null, notes: e.notes ?? null,
+      const known = await getKnownExercises(client, userId);
+
+      // Validate all exercise names first
+      const resolved: { name: string; orig: typeof exercises[0] }[] = [];
+      const errors: string[] = [];
+      for (const e of exercises) {
+        const check = await validateExercise(e.exercise, client, userId, known);
+        if (check.valid) {
+          resolved.push({ name: check.name, orig: e });
+        } else {
+          errors.push(check.message);
+        }
+      }
+
+      if (errors.length > 0) {
+        return { content: [{ type: "text" as const, text: `Some exercises not recognized:\n${errors.join("\n")}\n\nFix the exercise names and retry. No sets were logged.` }] };
+      }
+
+      const rows = resolved.map((r) => ({
+        user_id: userId, date, exercise: r.name,
+        reps: r.orig.reps ?? null, weight_lbs: r.orig.weight_lbs ?? null,
+        duration_mins: r.orig.duration_mins ?? null, notes: r.orig.notes ?? null,
       }));
 
       const { error } = await client.from("workout_sets").insert(rows);
       if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
 
-      const lines = exercises.map((e) => {
-        let desc = `  - ${e.exercise}`;
-        if (e.reps) desc += ` ${e.reps} reps`;
-        if (e.weight_lbs) desc += ` @ ${e.weight_lbs} lbs`;
+      const lines = resolved.map((r) => {
+        let desc = `  - ${r.name}`;
+        if (r.orig.reps) desc += ` ${r.orig.reps} reps`;
+        if (r.orig.weight_lbs) desc += ` @ ${r.orig.weight_lbs} lbs`;
         return desc;
       });
-      return { content: [{ type: "text" as const, text: `Logged ${exercises.length} exercises for ${date}:\n${lines.join("\n")}` }] };
+      return { content: [{ type: "text" as const, text: `Logged ${resolved.length} exercises for ${date}:\n${lines.join("\n")}` }] };
     }
   );
 

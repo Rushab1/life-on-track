@@ -5,6 +5,54 @@ import { ACTIVITY_LABELS } from "@/config/constants";
 import { getActivitiesForDate } from "@/config/schedule";
 import type { ActivityCompletion, Plan } from "@/lib/types";
 
+/** Get all known activity codes: built-in + custom topics. */
+async function getKnownActivities(client: SupabaseClient, userId: string): Promise<Record<string, string>> {
+  const base = { ...ACTIVITY_LABELS };
+  const { data } = await client.from("custom_topics")
+    .select("code, label")
+    .eq("user_id", userId)
+    .in("category", ["activity", "gym_type"]);
+  for (const t of data ?? []) {
+    base[t.code] = t.label;
+  }
+  return base;
+}
+
+/** Validate an activity code. Returns matched code or error with suggestions. */
+function validateActivity(
+  code: string,
+  known: Record<string, string>
+): { valid: true; code: string } | { valid: false; message: string } {
+  // Exact match
+  if (known[code]) return { valid: true, code };
+
+  // Case-insensitive match on code
+  const lowerCode = code.toLowerCase();
+  const exactKey = Object.keys(known).find((k) => k.toLowerCase() === lowerCode);
+  if (exactKey) return { valid: true, code: exactKey };
+
+  // Match by label (user says "leetcode" instead of "lc")
+  const byLabel = Object.entries(known).find(([, label]) =>
+    label.toLowerCase() === lowerCode || label.toLowerCase().replace(/[\/\s]+/g, "").includes(lowerCode.replace(/[\/\s]+/g, ""))
+  );
+  if (byLabel) return { valid: true, code: byLabel[0] };
+
+  // Suggest similar
+  const suggestions = Object.entries(known)
+    .filter(([k, v]) => {
+      const kl = k.toLowerCase();
+      const vl = v.toLowerCase();
+      return kl.includes(lowerCode) || lowerCode.includes(kl) || vl.includes(lowerCode) || lowerCode.includes(vl);
+    })
+    .map(([k, v]) => `${k} (${v})`);
+
+  if (suggestions.length > 0) {
+    return { valid: false, message: `Unknown activity "${code}". Did you mean: ${suggestions.join(", ")}?` };
+  }
+  const allCodes = Object.entries(known).map(([k, v]) => `${k} (${v})`).join(", ");
+  return { valid: false, message: `Unknown activity "${code}". Valid codes: ${allCodes}` };
+}
+
 export function registerActivityTools(server: McpServer, client: SupabaseClient, userId: string) {
   server.tool(
     "get_activities",
@@ -57,47 +105,59 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
       activity_type: z.string().describe("Activity type code. Gym types: psh (Push), pll (Pull), lgh (Legs Heavy), lgl (Legs Light), yga (Yoga), rst (Rest). Prep activities: lc (LeetCode), ml (ML/AI), sd (System Design), beh (Behavioral), oss (FastMCP), vln (Violin), dte (Date Night), mck (Mock Interview), out (Outdoor Activity). Users can also create custom codes."),
     },
     async ({ date, activity_type }) => {
+      const known = await getKnownActivities(client, userId);
+      const check = validateActivity(activity_type, known);
+      if (!check.valid) return { content: [{ type: "text" as const, text: check.message }] };
+
       const { data: existing } = await client
         .from("activity_completions")
         .select("completed")
         .eq("user_id", userId)
         .eq("date", date)
-        .eq("activity_type", activity_type)
+        .eq("activity_type", check.code)
         .single();
 
       const newVal = !(existing?.completed ?? false);
       const { error } = await client.from("activity_completions").upsert(
-        { user_id: userId, date, activity_type, completed: newVal },
+        { user_id: userId, date, activity_type: check.code, completed: newVal },
         { onConflict: "user_id,date,activity_type" }
       );
 
-      if (error) {
-        return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
-      }
-      const label = ACTIVITY_LABELS[activity_type] ?? activity_type;
+      if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      const label = known[check.code] ?? check.code;
       return { content: [{ type: "text" as const, text: `${label} marked as ${newVal ? "completed" : "not completed"} for ${date}.` }] };
     }
   );
 
   server.tool(
     "complete_activities",
-    "Mark multiple activities as completed for a date",
+    "Mark multiple activities as completed for a date. All activity codes must be valid — if any are unknown, the entire request is rejected with suggestions.",
     {
       date: z.string().describe("Date in YYYY-MM-DD format"),
       activity_types: z.array(z.string()).describe("Activity type codes to mark complete. See toggle_activity for valid codes."),
     },
     async ({ date, activity_types }) => {
-      const rows = activity_types.map((at) => ({
+      const known = await getKnownActivities(client, userId);
+      const resolved: string[] = [];
+      const errors: string[] = [];
+      for (const at of activity_types) {
+        const check = validateActivity(at, known);
+        if (check.valid) resolved.push(check.code);
+        else errors.push(check.message);
+      }
+      if (errors.length > 0) {
+        return { content: [{ type: "text" as const, text: errors.join("\n") }] };
+      }
+
+      const rows = resolved.map((at) => ({
         user_id: userId, date, activity_type: at, completed: true,
       }));
       const { error } = await client.from("activity_completions").upsert(rows, {
         onConflict: "user_id,date,activity_type",
       });
 
-      if (error) {
-        return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
-      }
-      const labels = activity_types.map((at) => ACTIVITY_LABELS[at] ?? at);
+      if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      const labels = resolved.map((at) => known[at] ?? at);
       return { content: [{ type: "text" as const, text: `Marked as completed for ${date}: ${labels.join(", ")}.` }] };
     }
   );
@@ -111,15 +171,17 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
       note: z.string().describe("Note text"),
     },
     async ({ date, activity_type, note }) => {
+      const known = await getKnownActivities(client, userId);
+      const check = validateActivity(activity_type, known);
+      if (!check.valid) return { content: [{ type: "text" as const, text: check.message }] };
+
       const { error } = await client.from("activity_completions").upsert(
-        { user_id: userId, date, activity_type, completed: true, notes: note || null },
+        { user_id: userId, date, activity_type: check.code, completed: true, notes: note || null },
         { onConflict: "user_id,date,activity_type" }
       );
 
-      if (error) {
-        return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
-      }
-      const label = ACTIVITY_LABELS[activity_type] ?? activity_type;
+      if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      const label = known[check.code] ?? check.code;
       return { content: [{ type: "text" as const, text: `Note saved for ${label} on ${date}: "${note}"` }] };
     }
   );
