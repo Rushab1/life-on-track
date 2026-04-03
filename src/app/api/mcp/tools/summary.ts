@@ -2,7 +2,8 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ACTIVITY_LABELS } from "@/config/constants";
-import type { ActivityCompletion, WorkoutSet, DailyLog } from "@/lib/types";
+import { getActivitiesForDate } from "@/config/schedule";
+import type { ActivityCompletion, WorkoutSet, DailyLog, Plan } from "@/lib/types";
 
 export function registerSummaryTools(server: McpServer, client: SupabaseClient, userId: string) {
   server.tool(
@@ -18,17 +19,37 @@ export function registerSummaryTools(server: McpServer, client: SupabaseClient, 
       ]);
 
       const dailyLog = dailyLogRes.data as DailyLog | null;
-      const activities = (activitiesRes.data ?? []) as ActivityCompletion[];
+      const completions = (activitiesRes.data ?? []) as ActivityCompletion[];
       const workouts = (workoutsRes.data ?? []) as WorkoutSet[];
+      const plan = planRes.data as Plan | null;
+
+      // Merge scheduled activities with completions
+      const scheduled = getActivitiesForDate(new Date(date + "T00:00:00"), plan);
+      const completionMap: Record<string, { completed: boolean; notes: string | null }> = {};
+      for (const c of completions) {
+        completionMap[c.activity_type] = { completed: c.completed, notes: c.notes };
+      }
+
+      const activities = scheduled.map((act) => ({
+        type: act, label: ACTIVITY_LABELS[act] ?? act,
+        scheduled: true,
+        completed: completionMap[act]?.completed ?? false,
+        notes: completionMap[act]?.notes ?? null,
+      }));
+      for (const c of completions) {
+        if (!scheduled.includes(c.activity_type)) {
+          activities.push({
+            type: c.activity_type, label: ACTIVITY_LABELS[c.activity_type] ?? c.activity_type,
+            scheduled: false, completed: c.completed, notes: c.notes,
+          });
+        }
+      }
 
       const summary = {
         date,
         pain_level: dailyLog?.pain_level ?? null,
         notes: dailyLog?.notes ?? null,
-        activities: activities.map((a) => ({
-          type: a.activity_type, label: ACTIVITY_LABELS[a.activity_type] ?? a.activity_type,
-          completed: a.completed, notes: a.notes,
-        })),
+        activities,
         workout_sets: workouts.map((w) => ({
           exercise: w.exercise, reps: w.reps,
           weight_lbs: w.weight_lbs, duration_mins: w.duration_mins, notes: w.notes,

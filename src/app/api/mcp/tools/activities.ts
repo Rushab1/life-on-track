@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ACTIVITY_LABELS } from "@/config/constants";
 import { getActivitiesForDate } from "@/config/schedule";
-import type { ActivityCompletion } from "@/lib/types";
+import type { ActivityCompletion, Plan } from "@/lib/types";
 
 export function registerActivityTools(server: McpServer, client: SupabaseClient, userId: string) {
   server.tool(
@@ -11,17 +11,18 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
     "Get activity completions for a date, including what's scheduled by the plan. Returns both scheduled and ad-hoc activities with their completion status. Activities are independent of plans — plans define the schedule, but completions are tracked separately.",
     { date: z.string().describe("Date in YYYY-MM-DD format") },
     async ({ date }) => {
-      const { data, error } = await client
-        .from("activity_completions")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("date", date);
+      const [completionsRes, planRes] = await Promise.all([
+        client.from("activity_completions").select("*").eq("user_id", userId).eq("date", date),
+        client.from("plans").select("*").eq("user_id", userId).lte("start_date", date).gte("end_date", date).limit(1).single(),
+      ]);
 
+      const { data, error } = completionsRes;
       if (error) {
         return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
       }
 
-      const scheduled = getActivitiesForDate(new Date(date + "T00:00:00"));
+      const plan = planRes.data as Plan | null;
+      const scheduled = getActivitiesForDate(new Date(date + "T00:00:00"), plan);
       const completions = (data ?? []) as ActivityCompletion[];
       const completionMap: Record<string, { completed: boolean; notes: string | null }> = {};
       for (const c of completions) {
