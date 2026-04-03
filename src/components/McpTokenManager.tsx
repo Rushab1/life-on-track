@@ -94,12 +94,9 @@ export default function McpTokenManager({ userId }: { userId: string }) {
       {
         mcpServers: {
           "life-on-track": {
-            command: "npx",
-            args: ["life-on-track-mcp"],
-            env: {
-              LOT_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://your-project.supabase.co",
-              LOT_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "your-anon-key",
-              LOT_MCP_TOKEN: generatedToken,
+            url: `${window.location.origin}/api/mcp`,
+            headers: {
+              Authorization: `Bearer ${generatedToken}`,
             },
           },
         },
