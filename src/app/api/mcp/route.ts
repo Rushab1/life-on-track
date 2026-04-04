@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { exchangeMcpToken } from "./auth";
+import { authenticateRequest } from "./auth";
 import { registerAllTools } from "./tools";
 import { checkIpLimit, checkAuthFailureLimit, checkUserLimit } from "./rate-limit";
 
@@ -42,7 +42,7 @@ async function handleMcpRequest(req: Request): Promise<Response> {
 
   let auth;
   try {
-    auth = await exchangeMcpToken(token);
+    auth = await authenticateRequest(token);
   } catch (err) {
     if (!checkAuthFailureLimit(ip)) {
       return jsonError("Too many failed authentication attempts", 429);
