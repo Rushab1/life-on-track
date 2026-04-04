@@ -2,6 +2,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { exchangeMcpToken } from "./auth";
 import { registerAllTools } from "./tools";
+import { checkIpLimit, checkAuthFailureLimit, checkUserLimit } from "./rate-limit";
+
+const NO_STORE = { "Cache-Control": "no-store" };
 
 function extractBearer(req: Request): string | null {
   const auth = req.headers.get("authorization");
@@ -9,14 +12,29 @@ function extractBearer(req: Request): string | null {
   return auth.slice(7);
 }
 
+function getClientIp(req: Request): string {
+  return (
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "unknown"
+  );
+}
+
 function jsonError(message: string, status: number): Response {
   return new Response(JSON.stringify({ error: message }), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...NO_STORE },
   });
 }
 
 async function handleMcpRequest(req: Request): Promise<Response> {
+  const ip = getClientIp(req);
+
+  // Pre-auth IP rate limit
+  if (!checkIpLimit(ip)) {
+    return jsonError("Too many requests", 429);
+  }
+
   const token = extractBearer(req);
   if (!token) {
     return jsonError("Missing Authorization: Bearer <token>", 401);
@@ -26,8 +44,16 @@ async function handleMcpRequest(req: Request): Promise<Response> {
   try {
     auth = await exchangeMcpToken(token);
   } catch (err) {
+    if (!checkAuthFailureLimit(ip)) {
+      return jsonError("Too many failed authentication attempts", 429);
+    }
     const message = err instanceof Error ? err.message : "Authentication failed";
     return jsonError(message, 401);
+  }
+
+  // Post-auth user rate limit
+  if (!checkUserLimit(auth.userId)) {
+    return jsonError("Too many requests", 429);
   }
 
   const server = new McpServer({
