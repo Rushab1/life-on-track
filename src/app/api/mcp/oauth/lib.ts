@@ -127,26 +127,28 @@ export async function verifyAccessToken(token: string): Promise<{
   };
 }
 
-// --- Supabase JWT minting (for RLS) ---
+// --- Supabase JWT minting (for RLS, via edge function) ---
 
 export async function mintSupabaseJwt(userId: string): Promise<string> {
-  const secret = process.env.SUPABASE_JWT_SECRET;
-  if (!secret) throw new Error("Missing SUPABASE_JWT_SECRET env var");
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const now = Math.floor(Date.now() / 1000);
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-  return signJwt(
-    {
-      aud: "authenticated",
-      exp: now + ACCESS_TOKEN_TTL,
-      iat: now,
-      iss: `${supabaseUrl}/auth/v1`,
-      sub: userId,
-      role: "authenticated",
+  const res = await fetch(`${supabaseUrl}/functions/v1/mint-user-jwt`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${serviceRoleKey}`,
     },
-    secret,
-  );
+    body: JSON.stringify({ user_id: userId }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(`Failed to mint Supabase JWT: ${(body as Record<string, string>).error ?? res.statusText}`);
+  }
+
+  const { access_token } = (await res.json()) as { access_token: string };
+  return access_token;
 }
 
 // --- PKCE ---
