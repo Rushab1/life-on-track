@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Plan } from "@/lib/types";
+import { dateSchema, uuidSchema, safeErrorMessage } from "../validation";
 
 export function registerPlanTools(server: McpServer, client: SupabaseClient, userId: string) {
   server.tool(
@@ -13,7 +14,7 @@ export function registerPlanTools(server: McpServer, client: SupabaseClient, use
         .from("plans").select("*").eq("user_id", userId)
         .order("start_date", { ascending: false });
 
-      if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      if (error) return { content: [{ type: "text" as const, text: safeErrorMessage(error) }] };
       if (!data || data.length === 0) return { content: [{ type: "text" as const, text: "No plans found." }] };
       const plans = (data as Plan[]).map((p) => ({
         id: p.id, name: p.name, start_date: p.start_date, end_date: p.end_date,
@@ -26,14 +27,14 @@ export function registerPlanTools(server: McpServer, client: SupabaseClient, use
   server.tool(
     "get_active_plan",
     "Get the plan that covers a specific date. Returns the plan's gym_schedule and prep_schedule. If no plan covers the date, returns a message saying so — the user needs to create a plan first.",
-    { date: z.string().describe("Date in YYYY-MM-DD format") },
+    { date: dateSchema.describe("Date in YYYY-MM-DD format") },
     async ({ date }) => {
       const { data, error } = await client
         .from("plans").select("*").eq("user_id", userId)
         .lte("start_date", date).gte("end_date", date)
         .limit(1).single();
 
-      if (error && error.code !== "PGRST116") return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      if (error && error.code !== "PGRST116") return { content: [{ type: "text" as const, text: safeErrorMessage(error) }] };
       if (!data) {
         return {
           content: [{
@@ -62,20 +63,23 @@ export function registerPlanTools(server: McpServer, client: SupabaseClient, use
 Example gym_schedule: {"0":"rst","1":"psh","2":"lgh","3":"rst","4":"lgl","5":"pll","6":"yga"}
 Example prep_schedule: {"0":["oss"],"1":["vln","lc"],"2":["ml"],"3":["ml","lc"],"4":["lc"],"5":["dte"],"6":["sd"]}`,
     {
-      name: z.string().describe("Plan name"),
-      start_date: z.string().describe("Start date YYYY-MM-DD"),
-      end_date: z.string().describe("End date YYYY-MM-DD"),
-      gym_schedule: z.record(z.string(), z.string()).describe("Day-of-week to gym type. Keys are '0'-'6' where 0=Sunday, 6=Saturday. Values: psh (Push), pll (Pull), lgh (Legs Heavy), lgl (Legs Light), yga (Yoga), rst (Rest)."),
-      prep_schedule: z.record(z.string(), z.array(z.string())).describe("Day-of-week to prep activity arrays. Keys are '0'-'6' (0=Sunday). Values are arrays of activity codes: lc (LeetCode), ml (ML/AI), sd (System Design), beh (Behavioral), oss (FastMCP), vln (Violin), dte (Date Night), mck (Mock Interview), out (Outdoor Activity)."),
+      name: z.string().max(200).describe("Plan name"),
+      start_date: dateSchema.describe("Start date YYYY-MM-DD"),
+      end_date: dateSchema.describe("End date YYYY-MM-DD"),
+      gym_schedule: z.record(z.string(), z.string().max(50)).describe("Day-of-week to gym type. Keys are '0'-'6' where 0=Sunday, 6=Saturday. Values: psh (Push), pll (Pull), lgh (Legs Heavy), lgl (Legs Light), yga (Yoga), rst (Rest)."),
+      prep_schedule: z.record(z.string(), z.array(z.string().max(50)).max(20)).describe("Day-of-week to prep activity arrays. Keys are '0'-'6' (0=Sunday). Values are arrays of activity codes: lc (LeetCode), ml (ML/AI), sd (System Design), beh (Behavioral), oss (FastMCP), vln (Violin), dte (Date Night), mck (Mock Interview), out (Outdoor Activity)."),
     },
     async ({ name, start_date, end_date, gym_schedule, prep_schedule }) => {
+      if (start_date > end_date) {
+        return { content: [{ type: "text" as const, text: "start_date must be on or before end_date." }] };
+      }
       const { error } = await client.from("plans").insert({
         user_id: userId, name, start_date, end_date,
         gym_schedule,
         prep_schedule,
       });
 
-      if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      if (error) return { content: [{ type: "text" as const, text: safeErrorMessage(error) }] };
       return { content: [{ type: "text" as const, text: `Plan "${name}" created for ${start_date} to ${end_date}.` }] };
     }
   );
@@ -84,12 +88,12 @@ Example prep_schedule: {"0":["oss"],"1":["vln","lc"],"2":["ml"],"3":["ml","lc"],
     "update_plan",
     "Update an existing plan",
     {
-      id: z.string().describe("Plan ID (UUID from get_plans)"),
-      name: z.string().optional().describe("New plan name"),
-      start_date: z.string().optional().describe("New start date YYYY-MM-DD"),
-      end_date: z.string().optional().describe("New end date YYYY-MM-DD"),
-      gym_schedule: z.record(z.string(), z.string()).optional().describe("Updated gym schedule. Same format as create_plan: keys '0'-'6' (0=Sunday), values are gym type codes."),
-      prep_schedule: z.record(z.string(), z.array(z.string())).optional().describe("Updated prep schedule. Same format as create_plan."),
+      id: uuidSchema.describe("Plan ID (UUID from get_plans)"),
+      name: z.string().max(200).optional().describe("New plan name"),
+      start_date: dateSchema.optional().describe("New start date YYYY-MM-DD"),
+      end_date: dateSchema.optional().describe("New end date YYYY-MM-DD"),
+      gym_schedule: z.record(z.string(), z.string().max(50)).optional().describe("Updated gym schedule. Same format as create_plan: keys '0'-'6' (0=Sunday), values are gym type codes."),
+      prep_schedule: z.record(z.string(), z.array(z.string().max(50)).max(20)).optional().describe("Updated prep schedule. Same format as create_plan."),
     },
     async ({ id, ...updates }) => {
       const cleanUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -100,7 +104,7 @@ Example prep_schedule: {"0":["oss"],"1":["vln","lc"],"2":["ml"],"3":["ml","lc"],
       if (updates.prep_schedule !== undefined) cleanUpdates.prep_schedule = updates.prep_schedule;
 
       const { error } = await client.from("plans").update(cleanUpdates).eq("user_id", userId).eq("id", id);
-      if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      if (error) return { content: [{ type: "text" as const, text: safeErrorMessage(error) }] };
       return { content: [{ type: "text" as const, text: `Plan ${id} updated.` }] };
     }
   );
@@ -108,10 +112,10 @@ Example prep_schedule: {"0":["oss"],"1":["vln","lc"],"2":["ml"],"3":["ml","lc"],
   server.tool(
     "delete_plan",
     "Delete a plan",
-    { id: z.string().describe("Plan ID to delete") },
+    { id: uuidSchema.describe("Plan ID to delete") },
     async ({ id }) => {
       const { error } = await client.from("plans").delete().eq("user_id", userId).eq("id", id);
-      if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      if (error) return { content: [{ type: "text" as const, text: safeErrorMessage(error) }] };
       return { content: [{ type: "text" as const, text: `Plan ${id} deleted.` }] };
     }
   );

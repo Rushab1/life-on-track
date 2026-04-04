@@ -1,15 +1,15 @@
-import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ACTIVITY_LABELS } from "@/config/constants";
 import { getActivitiesForDate } from "@/config/schedule";
 import type { ActivityCompletion, WorkoutSet, DailyLog, Plan } from "@/lib/types";
+import { dateSchema } from "../validation";
 
 export function registerSummaryTools(server: McpServer, client: SupabaseClient, userId: string) {
   server.tool(
     "get_day_summary",
     "Get a full summary of a single day: pain level (0-10), all activity completions, all workout sets, and which plan is active. This is the best starting tool — call it first to understand the user's day before making changes.",
-    { date: z.string().describe("Date in YYYY-MM-DD format") },
+    { date: dateSchema.describe("Date in YYYY-MM-DD format") },
     async ({ date }) => {
       const [dailyLogRes, activitiesRes, workoutsRes, planRes] = await Promise.all([
         client.from("daily_logs").select("*").eq("user_id", userId).eq("date", date).single(),
@@ -64,8 +64,8 @@ export function registerSummaryTools(server: McpServer, client: SupabaseClient, 
     "get_week_summary",
     "Get an aggregated summary for a date range (defaults to past 7 days). Returns average pain level, activity completion rates by type, number of workout days, and total exercises logged.",
     {
-      start_date: z.string().optional().describe("Start date YYYY-MM-DD (defaults to 7 days ago)"),
-      end_date: z.string().optional().describe("End date YYYY-MM-DD (defaults to today)"),
+      start_date: dateSchema.optional().describe("Start date YYYY-MM-DD (defaults to 7 days ago)"),
+      end_date: dateSchema.optional().describe("End date YYYY-MM-DD (defaults to today)"),
     },
     async ({ start_date, end_date }) => {
       const endDate = end_date ?? new Date().toISOString().split("T")[0];

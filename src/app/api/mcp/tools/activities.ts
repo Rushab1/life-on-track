@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ACTIVITY_LABELS } from "@/config/constants";
 import { getActivitiesForDate } from "@/config/schedule";
 import type { ActivityCompletion, Plan } from "@/lib/types";
+import { dateSchema, safeErrorMessage } from "../validation";
 
 /** Get all known activity codes: built-in + custom topics. */
 async function getKnownActivities(client: SupabaseClient, userId: string): Promise<Record<string, string>> {
@@ -57,7 +58,7 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
   server.tool(
     "get_activities",
     "Get activity completions for a date, including what's scheduled by the plan. Returns both scheduled and ad-hoc activities with their completion status. Activities are independent of plans — plans define the schedule, but completions are tracked separately.",
-    { date: z.string().describe("Date in YYYY-MM-DD format") },
+    { date: dateSchema.describe("Date in YYYY-MM-DD format") },
     async ({ date }) => {
       const [completionsRes, planRes] = await Promise.all([
         client.from("activity_completions").select("*").eq("user_id", userId).eq("date", date),
@@ -66,7 +67,7 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
 
       const { data, error } = completionsRes;
       if (error) {
-        return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+        return { content: [{ type: "text" as const, text: safeErrorMessage(error) }] };
       }
 
       const plan = planRes.data as Plan | null;
@@ -101,8 +102,8 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
     "toggle_activity",
     "Toggle an activity's completion status for a date",
     {
-      date: z.string().describe("Date in YYYY-MM-DD format"),
-      activity_type: z.string().describe("Activity type code. Gym types: psh (Push), pll (Pull), lgh (Legs Heavy), lgl (Legs Light), yga (Yoga), rst (Rest). Prep activities: lc (LeetCode), ml (ML/AI), sd (System Design), beh (Behavioral), oss (FastMCP), vln (Violin), dte (Date Night), mck (Mock Interview), out (Outdoor Activity). Users can also create custom codes."),
+      date: dateSchema.describe("Date in YYYY-MM-DD format"),
+      activity_type: z.string().max(50).describe("Activity type code. Gym types: psh (Push), pll (Pull), lgh (Legs Heavy), lgl (Legs Light), yga (Yoga), rst (Rest). Prep activities: lc (LeetCode), ml (ML/AI), sd (System Design), beh (Behavioral), oss (FastMCP), vln (Violin), dte (Date Night), mck (Mock Interview), out (Outdoor Activity). Users can also create custom codes."),
     },
     async ({ date, activity_type }) => {
       const known = await getKnownActivities(client, userId);
@@ -123,7 +124,7 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
         { onConflict: "user_id,date,activity_type" }
       );
 
-      if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      if (error) return { content: [{ type: "text" as const, text: safeErrorMessage(error) }] };
       const label = known[check.code] ?? check.code;
       return { content: [{ type: "text" as const, text: `${label} marked as ${newVal ? "completed" : "not completed"} for ${date}.` }] };
     }
@@ -133,8 +134,8 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
     "complete_activities",
     "Mark multiple activities as completed for a date. All activity codes must be valid — if any are unknown, the entire request is rejected with suggestions.",
     {
-      date: z.string().describe("Date in YYYY-MM-DD format"),
-      activity_types: z.array(z.string()).describe("Activity type codes to mark complete. See toggle_activity for valid codes."),
+      date: dateSchema.describe("Date in YYYY-MM-DD format"),
+      activity_types: z.array(z.string().max(50)).max(50).describe("Activity type codes to mark complete. See toggle_activity for valid codes."),
     },
     async ({ date, activity_types }) => {
       const known = await getKnownActivities(client, userId);
@@ -156,7 +157,7 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
         onConflict: "user_id,date,activity_type",
       });
 
-      if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      if (error) return { content: [{ type: "text" as const, text: safeErrorMessage(error) }] };
       const labels = resolved.map((at) => known[at] ?? at);
       return { content: [{ type: "text" as const, text: `Marked as completed for ${date}: ${labels.join(", ")}.` }] };
     }
@@ -166,9 +167,9 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
     "set_activity_note",
     "Add or update a note on an activity for a date",
     {
-      date: z.string().describe("Date in YYYY-MM-DD format"),
-      activity_type: z.string().describe("Activity type code. See toggle_activity for valid codes."),
-      note: z.string().describe("Note text"),
+      date: dateSchema.describe("Date in YYYY-MM-DD format"),
+      activity_type: z.string().max(50).describe("Activity type code. See toggle_activity for valid codes."),
+      note: z.string().max(5000).describe("Note text"),
     },
     async ({ date, activity_type, note }) => {
       const known = await getKnownActivities(client, userId);
@@ -180,7 +181,7 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
         { onConflict: "user_id,date,activity_type" }
       );
 
-      if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+      if (error) return { content: [{ type: "text" as const, text: safeErrorMessage(error) }] };
       const label = known[check.code] ?? check.code;
       return { content: [{ type: "text" as const, text: `Note saved for ${label} on ${date}: "${note}"` }] };
     }
@@ -190,8 +191,8 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
     "delete_activity",
     "Delete an activity completion for a date. Removes the completion record entirely — the activity will show as not completed if it's still scheduled by the plan. Also works to remove ad-hoc activities that were added outside the plan.",
     {
-      date: z.string().describe("Date in YYYY-MM-DD format"),
-      activity_type: z.string().describe("Activity type code to delete. See toggle_activity for valid codes."),
+      date: dateSchema.describe("Date in YYYY-MM-DD format"),
+      activity_type: z.string().max(50).describe("Activity type code to delete. See toggle_activity for valid codes."),
     },
     async ({ date, activity_type }) => {
       const { error } = await client
@@ -202,7 +203,7 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
         .eq("activity_type", activity_type);
 
       if (error) {
-        return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+        return { content: [{ type: "text" as const, text: safeErrorMessage(error) }] };
       }
       const label = ACTIVITY_LABELS[activity_type] ?? activity_type;
       return { content: [{ type: "text" as const, text: `Deleted ${label} completion for ${date}.` }] };
@@ -213,8 +214,8 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
     "delete_all_exercises",
     "Delete ALL workout sets for a specific exercise on a date. Use this to remove an entire exercise from the day's log (e.g. all sets of 'Pull-ups' on 2026-04-03).",
     {
-      date: z.string().describe("Date in YYYY-MM-DD format"),
-      exercise: z.string().describe("Exercise name to delete all sets for"),
+      date: dateSchema.describe("Date in YYYY-MM-DD format"),
+      exercise: z.string().max(200).describe("Exercise name to delete all sets for"),
     },
     async ({ date, exercise }) => {
       const { error } = await client
@@ -225,7 +226,7 @@ export function registerActivityTools(server: McpServer, client: SupabaseClient,
         .eq("exercise", exercise);
 
       if (error) {
-        return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+        return { content: [{ type: "text" as const, text: safeErrorMessage(error) }] };
       }
       return { content: [{ type: "text" as const, text: `Deleted ${exercise} sets for ${date}.` }] };
     }
