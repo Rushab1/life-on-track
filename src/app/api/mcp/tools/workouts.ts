@@ -5,7 +5,7 @@ import type { WorkoutSet } from "@/lib/types";
 import { EXERCISES, WORKOUT_META } from "@/config/exercises";
 import { dateSchema, uuidSchema, safeErrorMessage } from "../validation";
 
-/** Get all known exercise names: built-in + warmup/cardio + custom topics + previously logged. */
+/** Get all known exercise names: built-in + warmup/cardio + custom topics + recent history (bounded). */
 async function getKnownExercises(client: SupabaseClient, userId: string): Promise<string[]> {
   const builtIn = [
     ...EXERCISES,
@@ -14,7 +14,9 @@ async function getKnownExercises(client: SupabaseClient, userId: string): Promis
 
   const [customRes, historyRes] = await Promise.all([
     client.from("custom_topics").select("label").eq("user_id", userId).eq("category", "exercise"),
-    client.from("workout_sets").select("exercise").eq("user_id", userId),
+    // Bounded scan: only recent exercises, ordered newest-first, capped at 500 rows
+    client.from("workout_sets").select("exercise").eq("user_id", userId)
+      .order("created_at", { ascending: false }).limit(500),
   ]);
 
   const custom = (customRes.data ?? []).map((r: { label: string }) => r.label);
