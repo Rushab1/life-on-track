@@ -26,33 +26,31 @@ export const DEFAULT_PREP_SCHEDULE: Record<string, ActivityType[]> = {
   "6": ["sd"],           // Sat
 };
 
-/** Get gym + prep activities for a date, using the active plan or defaults. */
+/** Get gym + prep activities for a date, using the active plan. Returns empty if no plan. */
 export function getActivitiesForDate(
   date: Date,
   plan?: Plan | null
 ): ActivityType[] {
+  if (!plan) return [];
   const day = String(date.getDay());
 
-  const gymSchedule = plan?.gym_schedule ?? DEFAULT_GYM_SCHEDULE;
-  const prepSchedule = plan?.prep_schedule ?? DEFAULT_PREP_SCHEDULE;
-
-  const gym = gymSchedule[day] ?? "rst";
-  const prep = prepSchedule[day] ?? [];
+  const gym = plan.gym_schedule[day] ?? "rst";
+  const prep = plan.prep_schedule[day] ?? [];
 
   return [gym as ActivityType, ...prep];
 }
 
-/** Whether this date is a workout day. */
+/** Whether this date is a workout day. Returns false if no plan. */
 export function isWorkoutDay(date: Date, plan?: Plan | null): boolean {
-  const gymSchedule = plan?.gym_schedule ?? DEFAULT_GYM_SCHEDULE;
-  const gym = gymSchedule[String(date.getDay())] ?? "rst";
+  if (!plan) return false;
+  const gym = plan.gym_schedule[String(date.getDay())] ?? "rst";
   return gym !== "rst";
 }
 
-/** Get the gym type key for this date. */
+/** Get the gym type key for this date. Returns "rst" if no plan. */
 export function getGymType(date: Date, plan?: Plan | null): GymType {
-  const gymSchedule = plan?.gym_schedule ?? DEFAULT_GYM_SCHEDULE;
-  return (gymSchedule[String(date.getDay())] ?? "rst") as GymType;
+  if (!plan) return "rst" as GymType;
+  return (plan.gym_schedule[String(date.getDay())] ?? "rst") as GymType;
 }
 
 /** Human-readable gym label for this date. */

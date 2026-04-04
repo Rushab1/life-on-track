@@ -17,6 +17,11 @@ function dateForDay(dayOfWeek: number): Date {
   return d;
 }
 
+const FULL_PLAN = {
+  gym_schedule: DEFAULT_GYM_SCHEDULE,
+  prep_schedule: DEFAULT_PREP_SCHEDULE,
+} as unknown as Plan;
+
 describe("DEFAULT_GYM_SCHEDULE", () => {
   it("Sunday is rest", () => expect(DEFAULT_GYM_SCHEDULE["0"]).toBe("rst"));
   it("Monday is push", () => expect(DEFAULT_GYM_SCHEDULE["1"]).toBe("psh"));
@@ -28,53 +33,62 @@ describe("DEFAULT_GYM_SCHEDULE", () => {
 });
 
 describe("getGymType", () => {
-  it("returns correct type for each day without a plan", () => {
-    expect(getGymType(dateForDay(0))).toBe("rst");
-    expect(getGymType(dateForDay(1))).toBe("psh");
-    expect(getGymType(dateForDay(2))).toBe("lgh");
-    expect(getGymType(dateForDay(3))).toBe("rst");
-    expect(getGymType(dateForDay(4))).toBe("lgl");
-    expect(getGymType(dateForDay(5))).toBe("pll");
-    expect(getGymType(dateForDay(6))).toBe("yga");
+  it("returns rst when no plan", () => {
+    expect(getGymType(dateForDay(1))).toBe("rst");
+    expect(getGymType(dateForDay(5))).toBe("rst");
+  });
+
+  it("returns correct type with a plan", () => {
+    expect(getGymType(dateForDay(0), FULL_PLAN)).toBe("rst");
+    expect(getGymType(dateForDay(1), FULL_PLAN)).toBe("psh");
+    expect(getGymType(dateForDay(2), FULL_PLAN)).toBe("lgh");
+    expect(getGymType(dateForDay(5), FULL_PLAN)).toBe("pll");
   });
 
   it("uses plan gym_schedule when provided", () => {
-    const plan: Partial<Plan> = {
-      gym_schedule: { "1": "lgh", "2": "psh" },
-    } as Plan;
-    expect(getGymType(dateForDay(1), plan as Plan)).toBe("lgh");
-    expect(getGymType(dateForDay(2), plan as Plan)).toBe("psh");
+    const plan = { gym_schedule: { "1": "lgh", "2": "psh" } } as unknown as Plan;
+    expect(getGymType(dateForDay(1), plan)).toBe("lgh");
+    expect(getGymType(dateForDay(2), plan)).toBe("psh");
   });
 
   it("falls back to rst for missing day in plan", () => {
-    const plan: Partial<Plan> = { gym_schedule: {} } as Plan;
-    expect(getGymType(dateForDay(1), plan as Plan)).toBe("rst");
+    const plan = { gym_schedule: {} } as unknown as Plan;
+    expect(getGymType(dateForDay(1), plan)).toBe("rst");
   });
 });
 
 describe("isWorkoutDay", () => {
-  it("rest days return false", () => {
-    expect(isWorkoutDay(dateForDay(0))).toBe(false); // Sun
-    expect(isWorkoutDay(dateForDay(3))).toBe(false); // Wed
+  it("returns false when no plan", () => {
+    expect(isWorkoutDay(dateForDay(0))).toBe(false);
+    expect(isWorkoutDay(dateForDay(1))).toBe(false);
+    expect(isWorkoutDay(dateForDay(5))).toBe(false);
   });
 
-  it("active days return true", () => {
-    expect(isWorkoutDay(dateForDay(1))).toBe(true); // Mon push
-    expect(isWorkoutDay(dateForDay(2))).toBe(true); // Tue legs heavy
-    expect(isWorkoutDay(dateForDay(4))).toBe(true); // Thu legs light
-    expect(isWorkoutDay(dateForDay(5))).toBe(true); // Fri pull
-    expect(isWorkoutDay(dateForDay(6))).toBe(true); // Sat yoga
+  it("rest days return false with a plan", () => {
+    expect(isWorkoutDay(dateForDay(0), FULL_PLAN)).toBe(false);
+    expect(isWorkoutDay(dateForDay(3), FULL_PLAN)).toBe(false);
+  });
+
+  it("active days return true with a plan", () => {
+    expect(isWorkoutDay(dateForDay(1), FULL_PLAN)).toBe(true);
+    expect(isWorkoutDay(dateForDay(2), FULL_PLAN)).toBe(true);
+    expect(isWorkoutDay(dateForDay(5), FULL_PLAN)).toBe(true);
+    expect(isWorkoutDay(dateForDay(6), FULL_PLAN)).toBe(true);
   });
 });
 
 describe("getActivitiesForDate", () => {
-  it("includes gym type as first activity", () => {
-    const activities = getActivitiesForDate(dateForDay(1));
+  it("returns empty when no plan", () => {
+    expect(getActivitiesForDate(dateForDay(1))).toEqual([]);
+  });
+
+  it("includes gym type as first activity with a plan", () => {
+    const activities = getActivitiesForDate(dateForDay(1), FULL_PLAN);
     expect(activities[0]).toBe("psh");
   });
 
-  it("includes prep activities", () => {
-    const activities = getActivitiesForDate(dateForDay(1)); // Mon
+  it("includes prep activities with a plan", () => {
+    const activities = getActivitiesForDate(dateForDay(1), FULL_PLAN);
     const prep = DEFAULT_PREP_SCHEDULE["1"];
     for (const p of prep) {
       expect(activities).toContain(p);
@@ -93,14 +107,18 @@ describe("getActivitiesForDate", () => {
 });
 
 describe("getGymLabel", () => {
-  it("returns human-readable label", () => {
+  it("returns Rest when no plan", () => {
     const label = getGymLabel(dateForDay(1));
-    expect(typeof label).toBe("string");
-    expect(label.length).toBeGreaterThan(0);
+    expect(label).toBe("Rest");
+  });
+
+  it("returns human-readable label with a plan", () => {
+    const label = getGymLabel(dateForDay(1), FULL_PLAN);
+    expect(label).toBe("Push");
   });
 
   it("uses custom labels when provided", () => {
-    const label = getGymLabel(dateForDay(1), undefined, { psh: "Push Day" });
+    const label = getGymLabel(dateForDay(1), FULL_PLAN, { psh: "Push Day" });
     expect(label).toBe("Push Day");
   });
 });

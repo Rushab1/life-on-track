@@ -10,6 +10,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // MCP API uses bearer tokens, not cookies — skip session refresh
+  if (request.nextUrl.pathname.startsWith("/api/mcp")) {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

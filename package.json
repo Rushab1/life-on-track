@@ -13,6 +13,7 @@
     "test:watch": "vitest tests/unit"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.100.1",
     "@tailwindcss/postcss": "^4.2.2",
@@ -20,7 +21,8 @@
     "next": "14.2.35",
     "react": "^18",
     "react-dom": "^18",
-    "tailwindcss": "^4.2.2"
+    "tailwindcss": "^4.2.2",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^20",
