@@ -10,8 +10,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // MCP API uses bearer tokens, not cookies — skip session refresh
-  if (request.nextUrl.pathname.startsWith("/api/mcp")) {
+  // API routes using bearer tokens, not cookies — skip session refresh
+  if (
+    request.nextUrl.pathname.startsWith("/api/mcp") ||
+    request.nextUrl.pathname.startsWith("/.well-known/") ||
+    request.nextUrl.pathname === "/register" ||
+    request.nextUrl.pathname === "/token" ||
+    request.nextUrl.pathname === "/revoke"
+  ) {
     return NextResponse.next();
   }
 
