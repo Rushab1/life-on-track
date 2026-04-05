@@ -83,6 +83,19 @@ create table custom_topics (
 alter table custom_topics enable row level security;
 create policy "own data" on custom_topics for all using (auth.uid() = user_id);
 
+-- Google Calendar OAuth tokens
+create table google_tokens (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  access_token text not null,
+  refresh_token text not null,
+  expires_at timestamptz not null,
+  calendar_id text not null default 'primary',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table google_tokens enable row level security;
+create policy "own tokens" on google_tokens for all using (auth.uid() = user_id);
 -- Ad-hoc life events (conferences, trips, appointments, etc.)
 create table life_events (
   id uuid primary key default gen_random_uuid(),
