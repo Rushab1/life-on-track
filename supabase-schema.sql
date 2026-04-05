@@ -133,9 +133,12 @@ create table widget_values (
   activity_type text,
   value jsonb not null,
   created_at timestamptz default now(),
-  updated_at timestamptz default now(),
-  unique(user_id, widget_id, date, activity_type)
+  updated_at timestamptz default now()
 );
+
+-- Coalesce NULL activity_type for uniqueness (NULL != NULL in Postgres)
+create unique index idx_widget_values_upsert
+  on widget_values(user_id, widget_id, date, coalesce(activity_type, ''));
 
 create index idx_widget_values_user_date on widget_values(user_id, date);
 create index idx_widget_definitions_user on widget_definitions(user_id);

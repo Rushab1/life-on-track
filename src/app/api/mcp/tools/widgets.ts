@@ -84,7 +84,7 @@ export function registerWidgetTools(server: McpServer, client: SupabaseClient, u
       // Fetch current widget
       const { data: widget, error: fetchErr } = await client
         .from("widget_definitions")
-        .select("id, type, config, user_id")
+        .select("id, type, config, user_id, name, scope, activity_filter, sort_order")
         .or(`user_id.is.null,user_id.eq.${userId}`)
         .eq("id", widget_id)
         .single();
@@ -106,11 +106,12 @@ export function registerWidgetTools(server: McpServer, client: SupabaseClient, u
       if (widget.user_id === null) {
         const { data: copy, error: copyErr } = await client.from("widget_definitions").insert({
           user_id: userId,
-          name: (widget as Record<string, unknown>).name,
+          name: widget.name,
           type: widget.type,
           config,
-          scope: (widget as Record<string, unknown>).scope,
-          activity_filter: (widget as Record<string, unknown>).activity_filter,
+          scope: widget.scope,
+          activity_filter: widget.activity_filter,
+          sort_order: widget.sort_order,
         }).select("id").single();
 
         if (copyErr) return { content: [{ type: "text" as const, text: safeErrorMessage(copyErr) }] };
@@ -173,19 +174,83 @@ export function registerWidgetTools(server: McpServer, client: SupabaseClient, u
       activity_type: z.string().max(50).optional().describe("Activity code (required for activity-scoped widgets)"),
     },
     async ({ widget_id, date, value, activity_type }) => {
-      const { error } = await client.from("widget_values").upsert(
-        {
+      // Fetch widget definition for validation
+      const { data: widget, error: fetchErr } = await client
+        .from("widget_definitions")
+        .select("type, config, scope")
+        .or(`user_id.is.null,user_id.eq.${userId}`)
+        .eq("id", widget_id)
+        .single();
+
+      if (fetchErr || !widget) return { content: [{ type: "text" as const, text: "Widget not found." }] };
+
+      // Validate activity_type requirement
+      if (widget.scope === "activity" && !activity_type) {
+        return { content: [{ type: "text" as const, text: "activity_type is required for activity-scoped widgets." }] };
+      }
+
+      // Validate value against widget type
+      const config = (widget.config ?? {}) as Record<string, unknown>;
+      switch (widget.type) {
+        case "slider":
+        case "counter": {
+          if (typeof value !== "number") return { content: [{ type: "text" as const, text: `Expected a number for ${widget.type} widget.` }] };
+          const min = typeof config.min === "number" ? config.min : -Infinity;
+          const max = typeof config.max === "number" ? config.max : Infinity;
+          if (value < min || value > max) return { content: [{ type: "text" as const, text: `Value must be between ${min} and ${max}.` }] };
+          break;
+        }
+        case "boolean":
+          if (typeof value !== "boolean") return { content: [{ type: "text" as const, text: "Expected true or false for boolean widget." }] };
+          break;
+        case "text":
+          if (typeof value !== "string") return { content: [{ type: "text" as const, text: "Expected a string for text widget." }] };
+          if ((value as string).length > 5000) return { content: [{ type: "text" as const, text: "Text value must be under 5000 characters." }] };
+          break;
+        case "select": {
+          if (typeof value !== "string") return { content: [{ type: "text" as const, text: "Expected a string for select widget." }] };
+          const options = Array.isArray(config.options) ? config.options : [];
+          if (options.length > 0 && !options.includes(value)) {
+            return { content: [{ type: "text" as const, text: `Invalid option "${value}". Valid options: ${options.join(", ")}` }] };
+          }
+          break;
+        }
+      }
+
+      // Use raw SQL-style upsert to handle NULL activity_type via coalesce index
+      // First try to update existing row
+      const normalizedActivity = activity_type ?? null;
+      let query = client
+        .from("widget_values")
+        .update({ value, updated_at: new Date().toISOString() })
+        .eq("user_id", userId)
+        .eq("widget_id", widget_id)
+        .eq("date", date);
+
+      if (normalizedActivity) {
+        query = query.eq("activity_type", normalizedActivity);
+      } else {
+        query = query.is("activity_type", null);
+      }
+
+      const { data: updated, error: updateErr } = await query.select("id");
+
+      if (updateErr) return { content: [{ type: "text" as const, text: safeErrorMessage(updateErr) }] };
+
+      // If no row was updated, insert a new one
+      if (!updated || updated.length === 0) {
+        const { error: insertErr } = await client.from("widget_values").insert({
           user_id: userId,
           widget_id,
           date,
-          activity_type: activity_type ?? null,
+          activity_type: normalizedActivity,
           value,
           updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id,widget_id,date,activity_type" },
-      );
+        });
 
-      if (error) return { content: [{ type: "text" as const, text: safeErrorMessage(error) }] };
+        if (insertErr) return { content: [{ type: "text" as const, text: safeErrorMessage(insertErr) }] };
+      }
+
       return { content: [{ type: "text" as const, text: `Widget value saved for ${date}.` }] };
     }
   );
