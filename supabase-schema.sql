@@ -82,3 +82,18 @@ create table custom_topics (
 
 alter table custom_topics enable row level security;
 create policy "own data" on custom_topics for all using (auth.uid() = user_id);
+
+-- Ad-hoc life events (conferences, trips, appointments, etc.)
+create table life_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  date date not null,
+  title text not null,
+  notes text,
+  created_at timestamptz default now()
+);
+
+create index idx_life_events_user_date on life_events(user_id, date);
+
+alter table life_events enable row level security;
+create policy "own events" on life_events for all using (auth.uid() = user_id);
