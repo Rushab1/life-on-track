@@ -8,6 +8,7 @@ import { registerActivityTools } from "./tools/activities.js";
 import { registerWorkoutTools } from "./tools/workouts.js";
 import { registerPlanTools } from "./tools/plans.js";
 import { registerSummaryTools } from "./tools/summary.js";
+import { registerLifeEventTools } from "./tools/life-events.js";
 
 async function main() {
   // Authenticate with Supabase via MCP token
@@ -25,6 +26,7 @@ async function main() {
   registerWorkoutTools(server);
   registerPlanTools(server);
   registerSummaryTools(server);
+  registerLifeEventTools(server);
 
   // Connect via stdio
   const transport = new StdioServerTransport();
