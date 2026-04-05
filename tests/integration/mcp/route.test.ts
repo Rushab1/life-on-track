@@ -142,6 +142,8 @@ afterAll(async () => {
     adminClient.from("mcp_tokens").delete().eq("user_id", userIdB),
     adminClient.from("daily_logs").delete().eq("user_id", userIdA),
     adminClient.from("daily_logs").delete().eq("user_id", userIdB),
+    adminClient.from("life_events").delete().eq("user_id", userIdA),
+    adminClient.from("life_events").delete().eq("user_id", userIdB),
   ]);
   await Promise.all([deleteTestUser(userIdA), deleteTestUser(userIdB)]);
 }, 15_000);
@@ -228,6 +230,70 @@ describe("/api/mcp error sanitization", () => {
     expect(text).not.toContain("daily_logs");
     expect(text).not.toContain("user_id");
     expect(text).not.toMatch(/PGRST\d+/);
+  });
+});
+
+describe("/api/mcp life events", () => {
+  it("log_event creates an event and get_events returns it", async () => {
+    const { body: logBody } = await mcpToolCall(mcpTokenA, "log_event", {
+      date: "2026-07-01",
+      title: "Test Conference",
+      notes: "Day 1 keynote",
+    });
+    const logResult = (logBody as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
+    expect(logResult?.content?.[0]?.text).toContain("Test Conference");
+
+    const { body: getBody } = await mcpToolCall(mcpTokenA, "get_events", { date: "2026-07-01" });
+    const getResult = (getBody as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
+    const text = getResult?.content?.[0]?.text ?? "";
+    expect(text).toContain("Test Conference");
+    expect(text).toContain("Day 1 keynote");
+  });
+
+  it("life events appear in get_day_summary", async () => {
+    const { body } = await mcpToolCall(mcpTokenA, "get_day_summary", { date: "2026-07-01" });
+    const result = (body as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
+    const text = result?.content?.[0]?.text ?? "";
+    expect(text).toContain("life_events");
+    expect(text).toContain("Test Conference");
+  });
+
+  it("delete_event removes the event", async () => {
+    // Get the event ID
+    const { body: getBody } = await mcpToolCall(mcpTokenA, "get_events", { date: "2026-07-01" });
+    const getResult = (getBody as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
+    const events = JSON.parse(getResult?.content?.[0]?.text ?? "[]");
+    const eventId = events[0]?.id;
+    expect(eventId).toBeDefined();
+
+    // Delete it
+    const { body: delBody } = await mcpToolCall(mcpTokenA, "delete_event", { id: eventId });
+    const delResult = (delBody as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
+    expect(delResult?.content?.[0]?.text).toContain("deleted");
+
+    // Verify it's gone
+    const { body: checkBody } = await mcpToolCall(mcpTokenA, "get_events", { date: "2026-07-01" });
+    const checkResult = (checkBody as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
+    expect(checkResult?.content?.[0]?.text).toContain("No events found");
+  });
+
+  it("rejects partial date range (start_date without end_date)", async () => {
+    const { body } = await mcpToolCall(mcpTokenA, "get_events", { start_date: "2026-07-01" });
+    const result = (body as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
+    const text = result?.content?.[0]?.text ?? "";
+    expect(text).toContain("Both start_date and end_date are required");
+  });
+
+  it("user A cannot see user B life events", async () => {
+    await mcpToolCall(mcpTokenB, "log_event", {
+      date: "2026-07-02",
+      title: "User B secret trip",
+    });
+
+    const { body } = await mcpToolCall(mcpTokenA, "get_events", { date: "2026-07-02" });
+    const result = (body as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
+    const text = result?.content?.[0]?.text ?? "";
+    expect(text).not.toContain("User B secret trip");
   });
 });
 

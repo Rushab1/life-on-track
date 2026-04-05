@@ -13,11 +13,12 @@ export function registerSummaryTools(server: McpServer) {
       const client = getClient();
 
       // Run all queries in parallel
-      const [dailyLogRes, activitiesRes, workoutsRes, planRes] = await Promise.all([
+      const [dailyLogRes, activitiesRes, workoutsRes, planRes, eventsRes] = await Promise.all([
         client.from("daily_logs").select("*").eq("date", date).single(),
         client.from("activity_completions").select("*").eq("date", date),
         client.from("workout_sets").select("*").eq("date", date).order("created_at", { ascending: true }),
         client.from("plans").select("*").lte("start_date", date).gte("end_date", date).limit(1).single(),
+        client.from("life_events").select("id, title, notes").eq("date", date).order("created_at"),
       ]);
 
       const dailyLog = dailyLogRes.data as DailyLog | null;
@@ -52,6 +53,11 @@ export function registerSummaryTools(server: McpServer) {
         weight_lbs: w.weight_lbs,
         duration_mins: w.duration_mins,
         notes: w.notes,
+      }));
+
+      // Life events
+      summary.life_events = (eventsRes.data ?? []).map((e: { id: string; title: string; notes: string | null }) => ({
+        id: e.id, title: e.title, notes: e.notes,
       }));
 
       // Plan
