@@ -11,11 +11,12 @@ export function registerSummaryTools(server: McpServer, client: SupabaseClient, 
     "Get a full summary of a single day: pain level (0-10), all activity completions, all workout sets, and which plan is active. This is the best starting tool — call it first to understand the user's day before making changes.",
     { date: dateSchema.describe("Date in YYYY-MM-DD format") },
     async ({ date }) => {
-      const [dailyLogRes, activitiesRes, workoutsRes, planRes] = await Promise.all([
+      const [dailyLogRes, activitiesRes, workoutsRes, planRes, eventsRes] = await Promise.all([
         client.from("daily_logs").select("*").eq("user_id", userId).eq("date", date).single(),
         client.from("activity_completions").select("*").eq("user_id", userId).eq("date", date),
         client.from("workout_sets").select("*").eq("user_id", userId).eq("date", date).order("created_at", { ascending: true }),
         client.from("plans").select("*").eq("user_id", userId).lte("start_date", date).gte("end_date", date).limit(1).single(),
+        client.from("life_events").select("id, title, notes").eq("user_id", userId).eq("date", date).order("created_at"),
       ]);
 
       const dailyLog = dailyLogRes.data as DailyLog | null;
@@ -45,6 +46,10 @@ export function registerSummaryTools(server: McpServer, client: SupabaseClient, 
         }
       }
 
+      const lifeEvents = (eventsRes.data ?? []).map((e: { id: string; title: string; notes: string | null }) => ({
+        id: e.id, title: e.title, notes: e.notes,
+      }));
+
       const summary = {
         date,
         pain_level: dailyLog?.pain_level ?? null,
@@ -54,6 +59,7 @@ export function registerSummaryTools(server: McpServer, client: SupabaseClient, 
           exercise: w.exercise, reps: w.reps,
           weight_lbs: w.weight_lbs, duration_mins: w.duration_mins, notes: w.notes,
         })),
+        life_events: lifeEvents,
         active_plan: planRes.data ? { id: planRes.data.id, name: planRes.data.name } : null,
       };
       return { content: [{ type: "text" as const, text: JSON.stringify(summary, null, 2) }] };
