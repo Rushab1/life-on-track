@@ -5,6 +5,7 @@ import { registerActivityTools } from "./activities";
 import { registerWorkoutTools } from "./workouts";
 import { registerPlanTools } from "./plans";
 import { registerSummaryTools } from "./summary";
+import { registerGoogleCalendarTools } from "./google-calendar";
 
 export function registerAllTools(server: McpServer, client: SupabaseClient, userId: string) {
   registerDailyLogTools(server, client, userId);
@@ -12,4 +13,5 @@ export function registerAllTools(server: McpServer, client: SupabaseClient, user
   registerWorkoutTools(server, client, userId);
   registerPlanTools(server, client, userId);
   registerSummaryTools(server, client, userId);
+  registerGoogleCalendarTools(server, client, userId);
 }
