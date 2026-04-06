@@ -56,9 +56,14 @@ async function verifyOAuthToken(bearerToken: string): Promise<AuthResult> {
 export async function authenticateRequest(bearerToken: string): Promise<AuthResult> {
   try {
     return await verifyOAuthToken(bearerToken);
-  } catch {
-    // Not an OAuth token — try MCP token exchange
-    return exchangeMcpToken(bearerToken);
+  } catch (oauthErr) {
+    console.error("[OAUTH_ERR]", oauthErr instanceof Error ? oauthErr.message : oauthErr);
+    try {
+      return await exchangeMcpToken(bearerToken);
+    } catch (mcpErr) {
+      console.error("[MCP_ERR]", mcpErr instanceof Error ? mcpErr.message : mcpErr);
+      throw mcpErr;
+    }
   }
 }
 
