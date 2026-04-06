@@ -55,8 +55,8 @@ export async function POST(req: Request): Promise<Response> {
     {
       client_id: data.client_id,
       client_secret: clientSecret,
-      client_id_issued_at: data.client_id_issued_at,
-      client_secret_expires_at: expiresAt.toISOString(),
+      client_id_issued_at: Math.floor(new Date(data.client_id_issued_at).getTime() / 1000),
+      client_secret_expires_at: Math.floor(expiresAt.getTime() / 1000),
       redirect_uris: redirectUris,
       client_name: clientName,
       grant_types: ["authorization_code", "refresh_token"],

@@ -127,7 +127,7 @@ export async function verifyAccessToken(token: string): Promise<{
   };
 }
 
-// --- Supabase JWT minting (for RLS, via edge function) ---
+// --- Supabase JWT minting (via edge function) ---
 
 export async function mintSupabaseJwt(userId: string): Promise<string> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
