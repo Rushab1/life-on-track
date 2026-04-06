@@ -33,17 +33,31 @@ async function signJWT(payload: Record<string, unknown>, secret: string): Promis
   return `${signingInput}.${signatureB64}`;
 }
 
+/** Verify the caller is using a service_role key (works with both legacy JWT and new sb_secret_ formats). */
+function verifyServiceRole(authHeader: string): boolean {
+  const token = authHeader.replace("Bearer ", "");
+  const envKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+  // Exact match (covers new sb_secret_ format)
+  if (token === envKey) return true;
+
+  // Legacy JWT format: decode and check role claim
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    if (payload.role === "service_role") return true;
+  } catch { /* not a valid JWT */ }
+
+  return false;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    // Authenticate caller via service role key in Authorization header
     const authHeader = req.headers.get("authorization") ?? "";
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-    if (authHeader !== `Bearer ${supabaseServiceKey}`) {
+    if (!verifyServiceRole(authHeader)) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -58,9 +72,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Verify user exists
+    // Use the caller's key for admin operations (legacy JWT format works with JS client)
+    const callerKey = authHeader.replace("Bearer ", "");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    const adminClient = createClient(supabaseUrl, callerKey);
     const { data: user, error } = await adminClient.auth.admin.getUserById(user_id);
 
     if (error || !user) {
