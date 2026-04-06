@@ -72,7 +72,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use the caller's key for admin operations (legacy JWT format works with JS client)
     const callerKey = authHeader.replace("Bearer ", "");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const adminClient = createClient(supabaseUrl, callerKey);
@@ -108,8 +107,8 @@ Deno.serve(async (req) => {
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch {
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
+  } catch (err) {
+    return new Response(JSON.stringify({ error: "Internal server error", detail: String(err) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -127,28 +127,28 @@ export async function verifyAccessToken(token: string): Promise<{
   };
 }
 
-// --- Supabase JWT minting (via edge function) ---
+// --- Supabase JWT minting (direct, no edge function) ---
+// TODO: migrate from legacy HS256 JWT secret to Supabase's new RS256 signing keys
+// (asymmetric — allows token verification without exposing the signing secret)
 
 export async function mintSupabaseJwt(userId: string): Promise<string> {
+  const secret = process.env.SUPABASE_JWT_SECRET;
+  if (!secret) throw new Error("Missing SUPABASE_JWT_SECRET env var");
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const now = Math.floor(Date.now() / 1000);
 
-  const res = await fetch(`${supabaseUrl}/functions/v1/mint-user-jwt`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${serviceRoleKey}`,
+  return signJwt(
+    {
+      aud: "authenticated",
+      exp: now + 3600,
+      iat: now,
+      iss: `${supabaseUrl}/auth/v1`,
+      sub: userId,
+      role: "authenticated",
     },
-    body: JSON.stringify({ user_id: userId }),
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(`Failed to mint Supabase JWT: ${(body as Record<string, string>).error ?? res.statusText}`);
-  }
-
-  const { access_token } = (await res.json()) as { access_token: string };
-  return access_token;
+    secret,
+  );
 }
 
 // --- PKCE ---
