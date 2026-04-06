@@ -14,8 +14,8 @@ import { createClient } from "@supabase/supabase-js";
 const APP_URL = process.env.TEST_APP_URL ?? "https://life-on-track.vercel.app";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const TEST_EMAIL = process.env.TEST_USER_EMAIL ?? `oauth-test-${Date.now()}@life-on-track.test`;
-const TEST_PASS = process.env.TEST_USER_PASSWORD ?? "OAuthTestPass123!";
+const TEST_EMAIL = process.env.TEST_USER_EMAIL ?? "test-oauth@life-on-track.test";
+const TEST_PASS = process.env.TEST_USER_PASSWORD ?? "TestOAuth123!";
 
 // --- PKCE helpers ---
 
@@ -46,31 +46,19 @@ beforeAll(async () => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // Try signing in first (for pre-existing test accounts)
-  const { data: signIn } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: TEST_EMAIL,
     password: TEST_PASS,
   });
 
-  if (signIn.session) {
-    userAccessToken = signIn.session.access_token;
-    return;
-  }
-
-  // Fall back to signUp (works if email confirmation is disabled)
-  const { data: signUp, error } = await supabase.auth.signUp({
-    email: TEST_EMAIL,
-    password: TEST_PASS,
-  });
-
-  if (error || !signUp.session) {
+  if (error || !data.session) {
     throw new Error(
-      `Cannot get a test user session. Either set TEST_USER_EMAIL/TEST_USER_PASSWORD ` +
-        `to an existing account, or disable email confirmation in Supabase. ` +
-        `(${error?.message ?? "signUp returned no session — email confirmation likely required"})`
+      `Cannot sign in test user (${TEST_EMAIL}). ` +
+        `Set TEST_USER_EMAIL/TEST_USER_PASSWORD or create the account. ` +
+        `(${error?.message ?? "no session returned"})`
     );
   }
-  userAccessToken = signUp.session.access_token;
+  userAccessToken = data.session.access_token;
 }, 15_000);
 
 // --- Tests ---
@@ -270,6 +258,7 @@ describe("OAuth authorization + token exchange", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
         Authorization: `Bearer ${oauthAccessToken}`,
       },
       body: JSON.stringify({
@@ -294,6 +283,7 @@ describe("OAuth authorization + token exchange", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
         Authorization: `Bearer ${oauthAccessToken}`,
       },
       body: JSON.stringify({
@@ -331,6 +321,7 @@ describe("OAuth authorization + token exchange", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
         Authorization: `Bearer ${body.access_token}`,
       },
       body: JSON.stringify({
@@ -366,6 +357,7 @@ describe("OAuth authorization + token exchange", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
         Authorization: `Bearer ${tampered}`,
       },
       body: JSON.stringify({
