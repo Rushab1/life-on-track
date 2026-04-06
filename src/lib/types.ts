@@ -55,3 +55,16 @@ export interface CustomTopic {
   label: string;
   created_at: string;
 }
+
+export interface WidgetDefinition {
+  id: string;
+  user_id: string | null;
+  name: string;
+  type: "slider" | "counter" | "boolean" | "text" | "select";
+  config: Record<string, unknown>;
+  scope: "daily" | "activity" | "global";
+  activity_filter: string[] | null;
+  preset: boolean;
+  sort_order: number;
+  created_at: string;
+}
