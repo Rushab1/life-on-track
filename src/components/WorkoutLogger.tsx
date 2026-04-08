@@ -13,6 +13,7 @@ interface WorkoutLoggerProps {
   date: Date;
   userId: string;
   plan?: Plan | null;
+  override?: string | null;
   exercises: string[];
   workoutExercises: Record<string, string[]>;
   gymLabel: string;
@@ -23,14 +24,21 @@ export default function WorkoutLogger({
   date,
   userId,
   plan,
+  override,
   exercises,
   workoutExercises,
   gymLabel,
   onAddExercise,
 }: WorkoutLoggerProps) {
   const dateStr = toDateString(date);
-  const gymType = getGymType(date, plan);
-  const defaultExercises = workoutExercises[gymType] ?? [];
+  const gymType = getGymType(date, plan, override);
+  // Prefer the plan's workout_templates for this gym type, falling back to
+  // the legacy per-gym-type defaults if the plan doesn't define them.
+  const templateExercises = plan?.workout_templates?.[gymType];
+  const defaultExercises =
+    templateExercises && templateExercises.length > 0
+      ? templateExercises
+      : (workoutExercises[gymType] ?? []);
   const meta = WORKOUT_META[gymType] ?? { warmup: [], cardio: [] };
   const { sets: loggedSets, add, update, remove, removeAllByExercise } = useWorkoutSets(userId, dateStr);
   const allExercisesForHistory = [...meta.warmup, ...defaultExercises, ...meta.cardio];

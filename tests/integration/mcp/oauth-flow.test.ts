@@ -290,7 +290,7 @@ describe("OAuth authorization + token exchange", () => {
         jsonrpc: "2.0",
         id: 1,
         method: "tools/call",
-        params: { name: "get_daily_log", arguments: { date: "2026-01-01" } },
+        params: { name: "get_day", arguments: { date: "2026-01-01" } },
       }),
     });
 

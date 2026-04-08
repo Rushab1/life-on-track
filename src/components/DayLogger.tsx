@@ -7,6 +7,8 @@ import { useDailyLog } from "@/hooks/useDailyLog";
 import { useActivities } from "@/hooks/useActivities";
 import { usePlans, getActivePlan } from "@/hooks/usePlans";
 import { useCustomTopics } from "@/hooks/useCustomTopics";
+import { useDayOverride } from "@/hooks/useDayOverride";
+import { useWorkoutSets } from "@/hooks/useWorkoutSets";
 import PainSlider from "./PainSlider";
 import ActivityChecklist from "./ActivityChecklist";
 import WorkoutLogger from "./WorkoutLogger";
@@ -46,10 +48,18 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
     removeTopic,
   } = useCustomTopics(userId);
 
-  const activities = getActivitiesForDate(selectedDate, activePlan);
-  const showWorkout = isWorkoutDay(selectedDate, activePlan);
-  const gymType = getGymType(selectedDate, activePlan);
+  const { override: dayOverride } = useDayOverride(userId, dateStr);
+  const { sets: workoutSetsForDay } = useWorkoutSets(userId, dateStr);
+
+  const activities = getActivitiesForDate(selectedDate, activePlan, dayOverride);
+  const gymType = getGymType(selectedDate, activePlan, dayOverride);
   const gymLabel = activityLabels[gymType] ?? gymType;
+  // Show workout panel if the day's gym type is a workout, OR if an override
+  // made it one, OR if any sets already exist (e.g. user logged a workout on
+  // a rest day via MCP — don't hide the data just because the plan says rest).
+  const showWorkout =
+    isWorkoutDay(selectedDate, activePlan, dayOverride) ||
+    workoutSetsForDay.length > 0;
 
   const dailyLog = useDailyLog(userId, dateStr);
   const activityData = useActivities(userId, dateStr);
@@ -213,6 +223,7 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
                 date={selectedDate}
                 userId={userId}
                 plan={activePlan}
+                override={dayOverride}
                 exercises={allExercises}
                 workoutExercises={workoutExercises}
                 gymLabel={gymLabel}

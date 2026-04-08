@@ -150,14 +150,14 @@ afterAll(async () => {
 
 describe("/api/mcp authentication", () => {
   it("returns 401 when Authorization header is missing", async () => {
-    const res = await callMcpRoute(null, "get_daily_log", { date: "2026-01-01" });
+    const res = await callMcpRoute(null, "get_day", { date: "2026-01-01" });
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.error).toContain("Missing Authorization");
   });
 
   it("returns 401 for an invalid token", async () => {
-    const res = await callMcpRoute("lot_completely_bogus_token", "get_daily_log", { date: "2026-01-01" });
+    const res = await callMcpRoute("lot_completely_bogus_token", "get_day", { date: "2026-01-01" });
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.error).toBe("Invalid token");
@@ -178,7 +178,7 @@ describe("/api/mcp authentication", () => {
       body: JSON.stringify({ token: tempToken }),
     });
 
-    const res = await callMcpRoute(tempToken, "get_daily_log", { date: "2026-01-01" });
+    const res = await callMcpRoute(tempToken, "get_day", { date: "2026-01-01" });
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.error).toBe("Token has been revoked");
@@ -187,14 +187,14 @@ describe("/api/mcp authentication", () => {
 
 describe("/api/mcp tool execution", () => {
   it("successfully calls a read tool with a valid token", async () => {
-    const { status, body } = await mcpToolCall(mcpTokenA, "get_daily_log", { date: "2026-01-01" });
+    const { status, body } = await mcpToolCall(mcpTokenA, "get_day", { date: "2026-01-01" });
     expect(status).toBe(200);
     // MCP response should have a result with content
     expect(body).toHaveProperty("result");
   });
 
   it("rejects malformed date input", async () => {
-    const { status, body } = await mcpToolCall(mcpTokenA, "get_daily_log", { date: "not-a-date" });
+    const { status, body } = await mcpToolCall(mcpTokenA, "get_day", { date: "not-a-date" });
     expect(status).toBe(200); // MCP protocol returns 200 with error in result
     const result = (body as Record<string, unknown>).result as Record<string, unknown> | undefined;
     // Zod validation errors come back as MCP error responses
@@ -204,38 +204,41 @@ describe("/api/mcp tool execution", () => {
 
 describe("/api/mcp cross-user isolation", () => {
   it("user A cannot see user B data", async () => {
-    // User B saves a daily log
-    await mcpToolCall(mcpTokenB, "save_daily_log", {
+    // User B saves a daily log via save_day
+    await mcpToolCall(mcpTokenB, "save_day", {
       date: "2026-06-15",
       pain_level: 3,
       notes: "user B private data",
     });
 
-    // User A reads the same date — should get nothing
-    const { body } = await mcpToolCall(mcpTokenA, "get_daily_log", { date: "2026-06-15" });
+    // User A reads the same date — get_day always returns a shape, but
+    // pain_level and notes should be null and the private text absent.
+    const { body } = await mcpToolCall(mcpTokenA, "get_day", { date: "2026-06-15" });
     const result = (body as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
     const text = result?.content?.[0]?.text ?? "";
     expect(text).not.toContain("user B private data");
-    expect(text).toContain("No daily log found");
+    const parsed = JSON.parse(text);
+    expect(parsed.pain_level).toBeNull();
+    expect(parsed.notes).toBeNull();
   });
 });
 
 describe("/api/mcp error sanitization", () => {
   it("does not leak database details in error responses", async () => {
-    // Try to save with a pain_level that passes Zod but might cause a DB error
-    // We can't easily trigger a real DB error, but we verify the pattern works
-    // by checking that successful error responses don't contain table/column names
-    const { body } = await mcpToolCall(mcpTokenA, "get_daily_log", { date: "2026-01-01" });
+    // get_day hits multiple tables — the successful JSON response does
+    // surface column names like pain_level and activity_type as part of the
+    // public schema, so we just check for internal postgres error codes.
+    const { body } = await mcpToolCall(mcpTokenA, "get_day", { date: "2026-01-01" });
     const text = JSON.stringify(body);
-    expect(text).not.toContain("daily_logs");
-    expect(text).not.toContain("user_id");
     expect(text).not.toMatch(/PGRST\d+/);
+    expect(text).not.toContain("duplicate key value");
   });
 });
 
 describe("/api/mcp life events", () => {
-  it("log_event creates an event and get_events returns it", async () => {
-    const { body: logBody } = await mcpToolCall(mcpTokenA, "log_event", {
+  it("manage_event create then list returns the event", async () => {
+    const { body: logBody } = await mcpToolCall(mcpTokenA, "manage_event", {
+      action: "create",
       date: "2026-07-01",
       title: "Test Conference",
       notes: "Day 1 keynote",
@@ -243,54 +246,53 @@ describe("/api/mcp life events", () => {
     const logResult = (logBody as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
     expect(logResult?.content?.[0]?.text).toContain("Test Conference");
 
-    const { body: getBody } = await mcpToolCall(mcpTokenA, "get_events", { date: "2026-07-01" });
+    const { body: getBody } = await mcpToolCall(mcpTokenA, "manage_event", { action: "list", date: "2026-07-01" });
     const getResult = (getBody as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
     const text = getResult?.content?.[0]?.text ?? "";
     expect(text).toContain("Test Conference");
     expect(text).toContain("Day 1 keynote");
   });
 
-  it("life events appear in get_day_summary", async () => {
-    const { body } = await mcpToolCall(mcpTokenA, "get_day_summary", { date: "2026-07-01" });
+  it("life events appear in get_day", async () => {
+    const { body } = await mcpToolCall(mcpTokenA, "get_day", { date: "2026-07-01" });
     const result = (body as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
     const text = result?.content?.[0]?.text ?? "";
-    expect(text).toContain("life_events");
-    expect(text).toContain("Test Conference");
+    const parsed = JSON.parse(text);
+    expect(Array.isArray(parsed.events)).toBe(true);
+    expect(parsed.events.some((e: { title: string }) => e.title === "Test Conference")).toBe(true);
   });
 
-  it("delete_event removes the event", async () => {
-    // Get the event ID
-    const { body: getBody } = await mcpToolCall(mcpTokenA, "get_events", { date: "2026-07-01" });
+  it("manage_event delete removes the event", async () => {
+    const { body: getBody } = await mcpToolCall(mcpTokenA, "manage_event", { action: "list", date: "2026-07-01" });
     const getResult = (getBody as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
     const events = JSON.parse(getResult?.content?.[0]?.text ?? "[]");
     const eventId = events[0]?.id;
     expect(eventId).toBeDefined();
 
-    // Delete it
-    const { body: delBody } = await mcpToolCall(mcpTokenA, "delete_event", { id: eventId });
+    const { body: delBody } = await mcpToolCall(mcpTokenA, "manage_event", { action: "delete", id: eventId });
     const delResult = (delBody as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
     expect(delResult?.content?.[0]?.text).toContain("deleted");
 
-    // Verify it's gone
-    const { body: checkBody } = await mcpToolCall(mcpTokenA, "get_events", { date: "2026-07-01" });
+    const { body: checkBody } = await mcpToolCall(mcpTokenA, "manage_event", { action: "list", date: "2026-07-01" });
     const checkResult = (checkBody as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
     expect(checkResult?.content?.[0]?.text).toContain("No events found");
   });
 
   it("rejects partial date range (start_date without end_date)", async () => {
-    const { body } = await mcpToolCall(mcpTokenA, "get_events", { start_date: "2026-07-01" });
+    const { body } = await mcpToolCall(mcpTokenA, "manage_event", { action: "list", start_date: "2026-07-01" });
     const result = (body as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
     const text = result?.content?.[0]?.text ?? "";
     expect(text).toContain("Both start_date and end_date are required");
   });
 
   it("user A cannot see user B life events", async () => {
-    await mcpToolCall(mcpTokenB, "log_event", {
+    await mcpToolCall(mcpTokenB, "manage_event", {
+      action: "create",
       date: "2026-07-02",
       title: "User B secret trip",
     });
 
-    const { body } = await mcpToolCall(mcpTokenA, "get_events", { date: "2026-07-02" });
+    const { body } = await mcpToolCall(mcpTokenA, "manage_event", { action: "list", date: "2026-07-02" });
     const result = (body as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
     const text = result?.content?.[0]?.text ?? "";
     expect(text).not.toContain("User B secret trip");
@@ -299,7 +301,7 @@ describe("/api/mcp life events", () => {
 
 describe("/api/mcp Cache-Control headers", () => {
   it("sets no-store on auth error responses", async () => {
-    const res = await callMcpRoute(null, "get_daily_log", { date: "2026-01-01" });
+    const res = await callMcpRoute(null, "get_day", { date: "2026-01-01" });
     expect(res.headers.get("cache-control")).toBe("no-store");
   });
 });
