@@ -43,8 +43,18 @@ export interface Plan {
   end_date: string;
   gym_schedule: Record<string, GymType>;
   prep_schedule: Record<string, ActivityType[]>;
+  /** Map of gym type code → ordered list of exercise names for that workout. */
+  workout_templates: Record<string, string[]>;
   created_at: string;
   updated_at: string;
+}
+
+export interface DayOverride {
+  id: string;
+  user_id: string;
+  date: string;
+  gym_type: GymType;
+  created_at: string;
 }
 
 export interface CustomTopic {

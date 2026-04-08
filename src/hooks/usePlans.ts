@@ -29,10 +29,12 @@ export function usePlans(userId: string) {
     end_date: string;
     gym_schedule: Record<string, string>;
     prep_schedule: Record<string, string[]>;
+    workout_templates?: Record<string, string[]>;
   }) {
     await supabase.from("plans").insert({
       user_id: userId,
       ...plan,
+      workout_templates: plan.workout_templates ?? {},
     });
     await load();
   }
@@ -45,6 +47,7 @@ export function usePlans(userId: string) {
       end_date: string;
       gym_schedule: Record<string, string>;
       prep_schedule: Record<string, string[]>;
+      workout_templates: Record<string, string[]>;
     }>
   ) {
     await supabase

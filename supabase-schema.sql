@@ -41,6 +41,7 @@ create table plans (
   end_date date not null,
   gym_schedule jsonb not null default '{}',
   prep_schedule jsonb not null default '{}',
+  workout_templates jsonb not null default '{}',
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -156,4 +157,83 @@ create policy "delete own" on widget_definitions for delete
   using (auth.uid() = user_id);
 
 create policy "own values" on widget_values for all
+  using (auth.uid() = user_id);
+
+-- Canonical exercise catalog (replaces hardcoded list in app code).
+-- Entries with user_id = null are preset/built-in; user-owned rows are personal.
+create table exercises (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  name text not null,
+  category text,
+  created_at timestamptz default now(),
+  unique (user_id, name)
+);
+
+create index idx_exercises_user on exercises(user_id);
+
+alter table exercises enable row level security;
+create policy "read presets or own exercises" on exercises for select
+  using (user_id is null or auth.uid() = user_id);
+create policy "insert own exercises" on exercises for insert
+  with check (auth.uid() = user_id);
+create policy "update own exercises" on exercises for update
+  using (auth.uid() = user_id);
+create policy "delete own exercises" on exercises for delete
+  using (auth.uid() = user_id);
+
+-- Preset seed data (user_id is null). Categories: push, pull, legs_heavy,
+-- legs_light, shared, warmup, cardio. Safe to re-run.
+insert into exercises (user_id, name, category) values
+  (null, 'Incline Dumbbell Press', 'push'),
+  (null, 'Overhead Dumbbell Press', 'push'),
+  (null, 'Cable Pec Flies', 'push'),
+  (null, 'Lateral Raises', 'push'),
+  (null, 'Tricep Exercise', 'push'),
+  (null, 'Cable Tricep Extension', 'push'),
+  (null, 'Overhead Cable Tricep Extension', 'push'),
+  (null, 'Cable Tricep Pushdown', 'push'),
+  (null, 'Dumbbell Rows', 'pull'),
+  (null, 'Pull-ups', 'pull'),
+  (null, 'Seated Cable Row', 'pull'),
+  (null, 'Bicep Exercise', 'pull'),
+  (null, 'Dumbbell Squats', 'legs_heavy'),
+  (null, 'RDLs', 'legs_heavy'),
+  (null, 'Wrist Curls', 'legs_heavy'),
+  (null, 'Leg Raises', 'legs_heavy'),
+  (null, 'Lunges', 'legs_light'),
+  (null, 'Leg Extensions', 'legs_light'),
+  (null, 'Leg Curls', 'legs_light'),
+  (null, 'Single Leg Bridges', 'legs_light'),
+  (null, 'Calf Raises', 'shared'),
+  (null, 'Other', 'shared'),
+  (null, 'External Rotations', 'warmup'),
+  (null, 'Band Pull-Aparts', 'warmup'),
+  (null, 'Side Plank Leg Raises', 'warmup'),
+  (null, 'Hip Flexor Stretch', 'warmup'),
+  (null, 'Woodchoppers', 'warmup'),
+  (null, 'Face Pulls', 'warmup'),
+  (null, 'Pushups', 'warmup'),
+  (null, 'IT Band Stretch', 'warmup'),
+  (null, 'Run', 'cardio'),
+  (null, 'Stairmaster', 'cardio'),
+  (null, 'Incline Walk', 'cardio')
+on conflict do nothing;
+
+-- Per-date override of the plan's gym type. Lets a user swap Monday's push to
+-- Wednesday without mutating the recurring plan. Frontend and MCP tools check
+-- overrides before falling back to plan.gym_schedule[day_of_week].
+create table day_overrides (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  date date not null,
+  gym_type text not null,
+  created_at timestamptz default now(),
+  unique (user_id, date)
+);
+
+create index idx_day_overrides_user_date on day_overrides(user_id, date);
+
+alter table day_overrides enable row level security;
+create policy "own overrides" on day_overrides for all
   using (auth.uid() = user_id);
