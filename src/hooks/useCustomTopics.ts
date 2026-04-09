@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { ACTIVITY_LABELS } from "@/config/constants";
-import { EXERCISES, WORKOUT_EXERCISES } from "@/config/exercises";
 import type { CustomTopic } from "@/lib/types";
 
 const DEFAULT_GYM_OPTIONS = [
@@ -69,36 +68,16 @@ export function useCustomTopics(userId: string) {
     return [...DEFAULT_PREP_OPTIONS, ...custom];
   }, [topics]);
 
-  const exercises = useMemo(() => {
-    const base = (EXERCISES as readonly string[]).filter((e) => e !== "Other");
-    const custom = topics
-      .filter((t) => t.category === "exercise")
-      .map((t) => t.label);
-    return [...base, ...custom, "Other"];
-  }, [topics]);
-
-  const workoutExercises = useMemo(() => {
-    const base: Record<string, string[]> = { ...WORKOUT_EXERCISES };
-    for (const t of topics) {
-      if (t.category === "gym_type" && !base[t.code]) {
-        base[t.code] = [];
-      }
-    }
-    return base;
-  }, [topics]);
-
   async function addTopic(
-    category: "exercise" | "activity" | "gym_type",
+    category: "activity" | "gym_type",
     label: string
   ) {
     const code =
-      category === "exercise"
-        ? label
-        : "c_" +
-          label
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "_")
-            .replace(/^_|_$/g, "");
+      "c_" +
+      label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_|_$/g, "");
 
     const { error } = await supabase.from("custom_topics").insert({
       user_id: userId,
@@ -121,8 +100,6 @@ export function useCustomTopics(userId: string) {
     activityLabels,
     gymOptions,
     prepOptions,
-    exercises,
-    workoutExercises,
     addTopic,
     removeTopic,
   };

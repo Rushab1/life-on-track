@@ -7,6 +7,7 @@ import { useDailyLog } from "@/hooks/useDailyLog";
 import { useActivities } from "@/hooks/useActivities";
 import { usePlans, getActivePlan } from "@/hooks/usePlans";
 import { useCustomTopics } from "@/hooks/useCustomTopics";
+import { useExercises } from "@/hooks/useExercises";
 import { useDayOverride } from "@/hooks/useDayOverride";
 import { useWorkoutSets } from "@/hooks/useWorkoutSets";
 import PainSlider from "./PainSlider";
@@ -41,14 +42,18 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
     activityLabels,
     gymOptions,
     prepOptions,
-    exercises: allExercises,
-    workoutExercises,
     topics: customTopics,
     addTopic,
     removeTopic,
   } = useCustomTopics(userId);
 
-  const { override: dayOverride } = useDayOverride(userId, dateStr);
+  const { exercises: allExercises, addExercise } = useExercises(userId);
+
+  const { override: dayOverride, setOverride } = useDayOverride(
+    userId,
+    dateStr,
+  );
+  const [showSwap, setShowSwap] = useState(false);
   const { sets: workoutSetsForDay } = useWorkoutSets(userId, dateStr);
 
   const activities = getActivitiesForDate(selectedDate, activePlan, dayOverride);
@@ -194,6 +199,8 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
             prepOptions={prepOptions}
             activityLabels={activityLabels}
             customTopics={customTopics}
+            allExercises={allExercises}
+            onAddExercise={addExercise}
             onAddTopic={addTopic}
             onRemoveTopic={removeTopic}
             onCreate={createPlan}
@@ -204,6 +211,62 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
 
         {tab === "day" && (
           <div className="space-y-4">
+            {/* Today's gym + swap control */}
+            <div className="flex items-center justify-between bg-white rounded-2xl shadow-sm px-4 py-2.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs text-gray-500">Today:</span>
+                <span className="text-sm font-medium text-gray-800 truncate">
+                  {gymLabel}
+                </span>
+                {dayOverride && (
+                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">
+                    Swapped
+                  </span>
+                )}
+              </div>
+              <div className="relative flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowSwap((s) => !s)}
+                  className="text-xs text-gray-500 hover:text-gray-800 transition-colors"
+                >
+                  Swap workout
+                </button>
+                {showSwap && (
+                  <div className="absolute right-0 top-6 z-10 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[160px] py-1">
+                    {gymOptions.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={async () => {
+                          await setOverride(opt.value);
+                          setShowSwap(false);
+                        }}
+                        className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                    {dayOverride && (
+                      <>
+                        <div className="border-t border-gray-100 my-1" />
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await setOverride(null);
+                            setShowSwap(false);
+                          }}
+                          className="block w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-gray-50"
+                        >
+                          Clear override
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <PainSlider
               value={dailyLog.painLevel}
               onChange={dailyLog.setPainLevel}
@@ -225,9 +288,8 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
                 plan={activePlan}
                 override={dayOverride}
                 exercises={allExercises}
-                workoutExercises={workoutExercises}
                 gymLabel={gymLabel}
-                onAddExercise={(label) => addTopic("exercise", label)}
+                onAddExercise={addExercise}
               />
             )}
 

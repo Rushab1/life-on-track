@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
-/** Fetch the day_overrides row for (user, date). Returns the gym_type string or null. */
+/** Fetch (and mutate) the day_overrides row for (user, date). */
 export function useDayOverride(userId: string, dateStr: string) {
-  const [override, setOverride] = useState<string | null>(null);
+  const [override, setOverrideState] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -16,7 +16,7 @@ export function useDayOverride(userId: string, dateStr: string) {
       .eq("user_id", userId)
       .eq("date", dateStr)
       .maybeSingle();
-    setOverride(data?.gym_type ?? null);
+    setOverrideState(data?.gym_type ?? null);
     setLoading(false);
   }, [userId, dateStr]);
 
@@ -24,5 +24,26 @@ export function useDayOverride(userId: string, dateStr: string) {
     load();
   }, [load]);
 
-  return { override, loading, reload: load };
+  const setOverride = useCallback(
+    async (gymType: string | null) => {
+      if (gymType === null) {
+        await supabase
+          .from("day_overrides")
+          .delete()
+          .eq("user_id", userId)
+          .eq("date", dateStr);
+      } else {
+        await supabase
+          .from("day_overrides")
+          .upsert(
+            { user_id: userId, date: dateStr, gym_type: gymType },
+            { onConflict: "user_id,date" },
+          );
+      }
+      await load();
+    },
+    [userId, dateStr, load],
+  );
+
+  return { override, loading, setOverride, reload: load };
 }
