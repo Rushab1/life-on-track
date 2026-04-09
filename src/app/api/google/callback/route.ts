@@ -33,8 +33,12 @@ export async function GET(req: Request): Promise<Response> {
   });
 
   if (!tokenRes.ok) {
-    console.error("[Google OAuth] Token exchange failed:", await tokenRes.text());
-    return NextResponse.redirect(new URL("/?google=error", req.url));
+    const errBody = await tokenRes.text();
+    console.error("[Google OAuth] Token exchange failed:", errBody);
+    console.error("[Google OAuth] redirect_uri used:", getRedirectUri(req));
+    const errUrl = new URL("/?google=error", req.url);
+    errUrl.searchParams.set("detail", errBody.slice(0, 200));
+    return NextResponse.redirect(errUrl);
   }
 
   const tokens = (await tokenRes.json()) as {
