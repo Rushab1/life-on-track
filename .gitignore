@@ -27,9 +27,13 @@ yarn-error.log*
 
 # local env files
 .env*.local
+.env.vercel-check
 
 # vercel
 .vercel
+
+# supabase cli
+supabase/.temp/
 
 # typescript
 *.tsbuildinfo
