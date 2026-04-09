@@ -16,6 +16,8 @@ import WorkoutLogger from "./WorkoutLogger";
 import DailyNotes from "./DailyNotes";
 import Calendar from "./Calendar";
 import PlanManager from "./PlanManager";
+import WidgetConfigurator from "./WidgetConfigurator";
+import GoogleConnector from "./GoogleConnector";
 import McpTokenManager from "./McpTokenManager";
 
 interface DayLoggerProps {
@@ -175,7 +177,7 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
                   : "text-gray-500"
               }`}
             >
-              {t === "day" ? "Day" : t === "calendar" ? "Calendar" : t === "plans" ? "Plans" : "Settings"}
+              {t === "day" ? "Day" : t === "calendar" ? "Calendar" : t === "plans" ? "Plan & Customize" : "Settings"}
             </button>
           ))}
         </div>
@@ -189,24 +191,30 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
         )}
 
         {tab === "settings" && (
-          <McpTokenManager userId={userId} />
+          <div className="space-y-8">
+            <GoogleConnector userId={userId} />
+            <McpTokenManager userId={userId} />
+          </div>
         )}
 
         {tab === "plans" && (
-          <PlanManager
-            plans={plans}
-            gymOptions={gymOptions}
-            prepOptions={prepOptions}
-            activityLabels={activityLabels}
-            customTopics={customTopics}
-            allExercises={allExercises}
-            onAddExercise={addExercise}
-            onAddTopic={addTopic}
-            onRemoveTopic={removeTopic}
-            onCreate={createPlan}
-            onUpdate={updatePlan}
-            onDelete={removePlan}
-          />
+          <div className="space-y-8">
+            <PlanManager
+              plans={plans}
+              gymOptions={gymOptions}
+              prepOptions={prepOptions}
+              activityLabels={activityLabels}
+              customTopics={customTopics}
+              allExercises={allExercises}
+              onAddExercise={addExercise}
+              onAddTopic={addTopic}
+              onRemoveTopic={removeTopic}
+              onCreate={createPlan}
+              onUpdate={updatePlan}
+              onDelete={removePlan}
+            />
+            <WidgetConfigurator userId={userId} />
+          </div>
         )}
 
         {tab === "day" && (
