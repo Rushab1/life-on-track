@@ -168,20 +168,25 @@ export function registerReadTools(
         gym_type: string;
         gym_type_label: string;
         override: boolean;
+        warmup: string[];
         exercises: string[];
+        cardio: string[];
       } | null = null;
       if (plan) {
         const dow = String(new Date(date + "T00:00:00").getDay());
         const planGym = plan.gym_schedule?.[dow] ?? "rst";
         const gymType = overrideGym ?? planGym;
         const templates = plan.workout_templates ?? {};
+        const gymMeta = plan.workout_meta?.[gymType];
         planView = {
           id: plan.id,
           name: plan.name,
           gym_type: gymType,
           gym_type_label: ACTIVITY_LABELS[gymType] ?? gymType,
           override: overrideGym !== null,
+          warmup: Array.isArray(gymMeta?.warmup) ? gymMeta.warmup : [],
           exercises: Array.isArray(templates[gymType]) ? templates[gymType] : [],
+          cardio: Array.isArray(gymMeta?.cardio) ? gymMeta.cardio : [],
         };
       }
 

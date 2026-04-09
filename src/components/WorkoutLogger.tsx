@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { toDateString } from "@/lib/dates";
 import { getGymType } from "@/config/schedule";
-import { WORKOUT_META } from "@/config/exercises";
 import { useWorkoutSets } from "@/hooks/useWorkoutSets";
 import { useLastWorkout } from "@/hooks/useLastWorkout";
 import type { LastSetRow } from "@/hooks/useLastWorkout";
@@ -33,7 +32,7 @@ export default function WorkoutLogger({
   // The plan's workout_templates are the source of truth for which exercises
   // make up a given gym type. Empty list means the user hasn't configured one.
   const defaultExercises = plan?.workout_templates?.[gymType] ?? [];
-  const meta = WORKOUT_META[gymType] ?? { warmup: [], cardio: [] };
+  const meta = plan?.workout_meta?.[gymType] ?? { warmup: [], cardio: [] };
   const { sets: loggedSets, add, update, remove, removeAllByExercise } = useWorkoutSets(userId, dateStr);
   const allExercisesForHistory = [...meta.warmup, ...defaultExercises, ...meta.cardio];
   const lastSets = useLastWorkout(userId, dateStr, allExercisesForHistory);

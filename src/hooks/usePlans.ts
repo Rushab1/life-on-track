@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import type { Plan } from "@/lib/types";
+import type { Plan, WorkoutMeta } from "@/lib/types";
 
 export function usePlans(userId: string) {
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -30,11 +30,13 @@ export function usePlans(userId: string) {
     gym_schedule: Record<string, string>;
     prep_schedule: Record<string, string[]>;
     workout_templates?: Record<string, string[]>;
+    workout_meta?: Record<string, WorkoutMeta>;
   }) {
     await supabase.from("plans").insert({
       user_id: userId,
       ...plan,
       workout_templates: plan.workout_templates ?? {},
+      workout_meta: plan.workout_meta ?? {},
     });
     await load();
   }
@@ -48,6 +50,7 @@ export function usePlans(userId: string) {
       gym_schedule: Record<string, string>;
       prep_schedule: Record<string, string[]>;
       workout_templates: Record<string, string[]>;
+      workout_meta: Record<string, WorkoutMeta>;
     }>
   ) {
     await supabase

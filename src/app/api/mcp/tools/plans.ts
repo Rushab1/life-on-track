@@ -22,6 +22,18 @@ const workoutTemplatesSchema = z
     "Map of gym type code to exercise-name array. E.g. { psh: ['Incline Dumbbell Press', ...], pll: [...], lgh: [...], lgl: [...] }. Used so get_day can return 'what exercises does this workout include' without extra lookups.",
   );
 
+const workoutMetaSchema = z
+  .record(
+    z.string(),
+    z.object({
+      warmup: z.array(z.string().max(200)).max(20),
+      cardio: z.array(z.string().max(200)).max(20),
+    }),
+  )
+  .describe(
+    "Map of gym type code to { warmup: string[], cardio: string[] }. E.g. { psh: { warmup: ['External Rotations'], cardio: ['Run'] } }.",
+  );
+
 export function registerPlanTool(
   server: McpServer,
   client: SupabaseClient,
@@ -29,7 +41,7 @@ export function registerPlanTool(
 ) {
   server.tool(
     "manage_plan",
-    `Plan admin. action="list" returns all plans. "get" returns the plan covering a date. "create" requires name, start_date, end_date, gym_schedule, prep_schedule (workout_templates optional). "update" requires id + any field to change. "delete" requires id. workout_templates is a new field that maps gym_type codes (psh, lgh, etc.) to ordered exercise lists — populate it so get_day can return "what's today's push workout?".`,
+    `Plan admin. action="list" returns all plans. "get" returns the plan covering a date. "create" requires name, start_date, end_date, gym_schedule, prep_schedule (workout_templates, workout_meta optional). "update" requires id + any field to change. "delete" requires id. workout_templates maps gym_type codes to main exercise lists. workout_meta maps gym_type codes to { warmup: [...], cardio: [...] } — get_day returns all three sections (warmup, exercises, cardio) so MCP clients can see the full workout structure.`,
     {
       action: z
         .enum(["list", "get", "create", "update", "delete"])
@@ -44,6 +56,7 @@ export function registerPlanTool(
       gym_schedule: gymScheduleSchema.optional(),
       prep_schedule: prepScheduleSchema.optional(),
       workout_templates: workoutTemplatesSchema.optional(),
+      workout_meta: workoutMetaSchema.optional(),
     },
     async ({
       action,
@@ -55,6 +68,7 @@ export function registerPlanTool(
       gym_schedule,
       prep_schedule,
       workout_templates,
+      workout_meta,
     }) => {
       if (action === "list") {
         const { data, error } = await client
@@ -82,6 +96,7 @@ export function registerPlanTool(
           gym_schedule: p.gym_schedule,
           prep_schedule: p.prep_schedule,
           workout_templates: p.workout_templates ?? {},
+          workout_meta: p.workout_meta ?? {},
         }));
         return {
           content: [
@@ -140,6 +155,7 @@ export function registerPlanTool(
                   gym_schedule: plan.gym_schedule,
                   prep_schedule: plan.prep_schedule,
                   workout_templates: plan.workout_templates ?? {},
+                  workout_meta: plan.workout_meta ?? {},
                 },
                 null,
                 2,
@@ -178,6 +194,7 @@ export function registerPlanTool(
           gym_schedule,
           prep_schedule,
           workout_templates: workout_templates ?? {},
+          workout_meta: workout_meta ?? {},
         });
         if (error) {
           return {
@@ -217,6 +234,8 @@ export function registerPlanTool(
         if (prep_schedule !== undefined) patch.prep_schedule = prep_schedule;
         if (workout_templates !== undefined)
           patch.workout_templates = workout_templates;
+        if (workout_meta !== undefined)
+          patch.workout_meta = workout_meta;
 
         const { error } = await client
           .from("plans")

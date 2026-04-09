@@ -5,7 +5,7 @@ import {
   DEFAULT_GYM_SCHEDULE,
   DEFAULT_PREP_SCHEDULE,
 } from "@/config/schedule";
-import type { Plan, CustomTopic } from "@/lib/types";
+import type { Plan, CustomTopic, WorkoutMeta } from "@/lib/types";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -29,6 +29,7 @@ interface PlanManagerProps {
     gym_schedule: Record<string, string>;
     prep_schedule: Record<string, string[]>;
     workout_templates: Record<string, string[]>;
+    workout_meta: Record<string, WorkoutMeta>;
   }) => Promise<void>;
   onUpdate: (
     id: string,
@@ -39,6 +40,7 @@ interface PlanManagerProps {
       gym_schedule: Record<string, string>;
       prep_schedule: Record<string, string[]>;
       workout_templates: Record<string, string[]>;
+      workout_meta: Record<string, WorkoutMeta>;
     }>
   ) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
@@ -241,6 +243,7 @@ function PlanForm({
     gym_schedule: Record<string, string>;
     prep_schedule: Record<string, string[]>;
     workout_templates: Record<string, string[]>;
+    workout_meta: Record<string, WorkoutMeta>;
   }) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -256,6 +259,9 @@ function PlanForm({
   const [workoutTemplates, setWorkoutTemplates] = useState<
     Record<string, string[]>
   >(initial?.workout_templates ?? {});
+  const [workoutMeta, setWorkoutMeta] = useState<
+    Record<string, WorkoutMeta>
+  >(initial?.workout_meta ?? {});
   const [saving, setSaving] = useState(false);
 
   const [adding, setAdding] = useState<"gym_type" | "activity" | null>(null);
@@ -324,11 +330,13 @@ function PlanForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    // Trim templates to gym types still in the schedule so we don't carry
-    // dead entries forever.
+    // Trim templates/meta to gym types still in the schedule so we don't
+    // carry dead entries forever.
     const trimmedTemplates: Record<string, string[]> = {};
+    const trimmedMeta: Record<string, WorkoutMeta> = {};
     for (const gym of trainedGymTypes) {
       trimmedTemplates[gym] = workoutTemplates[gym] ?? [];
+      trimmedMeta[gym] = workoutMeta[gym] ?? { warmup: [], cardio: [] };
     }
     await onSave({
       name,
@@ -337,6 +345,7 @@ function PlanForm({
       gym_schedule: gymSchedule,
       prep_schedule: prepSchedule,
       workout_templates: trimmedTemplates,
+      workout_meta: trimmedMeta,
     });
     setSaving(false);
   }
@@ -502,21 +511,65 @@ function PlanForm({
             {trainedGymTypes.map((gymType) => {
               const label =
                 gymOptions.find((o) => o.value === gymType)?.label ?? gymType;
-              const list = workoutTemplates[gymType] ?? [];
+              const mainList = workoutTemplates[gymType] ?? [];
+              const meta = workoutMeta[gymType] ?? { warmup: [], cardio: [] };
+              const updateMeta = (field: "warmup" | "cardio", list: string[]) =>
+                setWorkoutMeta((prev) => ({
+                  ...prev,
+                  [gymType]: { ...prev[gymType] ?? { warmup: [], cardio: [] }, [field]: list },
+                }));
               return (
-                <WorkoutTemplateEditor
-                  key={gymType}
-                  label={label}
-                  exercises={list}
-                  allExercises={allExercises}
-                  onAdd={(ex) => addExerciseToTemplate(gymType, ex)}
-                  onRemove={(idx) => removeExerciseFromTemplate(gymType, idx)}
-                  onMove={(idx, dir) => moveExercise(gymType, idx, dir)}
-                  onCreateExercise={async (newName) => {
-                    await onAddExercise(newName);
-                    addExerciseToTemplate(gymType, newName);
-                  }}
-                />
+                <div key={gymType} className="border border-gray-100 rounded-lg p-3 space-y-3">
+                  <p className="text-xs font-semibold text-gray-700">{label}</p>
+                  <WorkoutTemplateEditor
+                    label="Warmup"
+                    exercises={meta.warmup}
+                    allExercises={allExercises}
+                    onAdd={(ex) => updateMeta("warmup", [...meta.warmup, ex])}
+                    onRemove={(idx) => updateMeta("warmup", meta.warmup.filter((_, i) => i !== idx))}
+                    onMove={(idx, dir) => {
+                      const next = [...meta.warmup];
+                      const t = idx + dir;
+                      if (t < 0 || t >= next.length) return;
+                      [next[idx], next[t]] = [next[t], next[idx]];
+                      updateMeta("warmup", next);
+                    }}
+                    onCreateExercise={async (newName) => {
+                      await onAddExercise(newName, "warmup");
+                      updateMeta("warmup", [...meta.warmup, newName]);
+                    }}
+                  />
+                  <WorkoutTemplateEditor
+                    label="Exercises"
+                    exercises={mainList}
+                    allExercises={allExercises}
+                    onAdd={(ex) => addExerciseToTemplate(gymType, ex)}
+                    onRemove={(idx) => removeExerciseFromTemplate(gymType, idx)}
+                    onMove={(idx, dir) => moveExercise(gymType, idx, dir)}
+                    onCreateExercise={async (newName) => {
+                      await onAddExercise(newName);
+                      addExerciseToTemplate(gymType, newName);
+                    }}
+                  />
+                  <WorkoutTemplateEditor
+                    label="Cardio"
+                    exercises={meta.cardio}
+                    allExercises={allExercises}
+                    onAdd={(ex) => updateMeta("cardio", [...meta.cardio, ex])}
+                    onRemove={(idx) => updateMeta("cardio", meta.cardio.filter((_, i) => i !== idx))}
+                    onMove={(idx, dir) => {
+                      const next = [...meta.cardio];
+                      const t = idx + dir;
+                      if (t < 0 || t >= next.length) return;
+                      [next[idx], next[t]] = [next[t], next[idx]];
+                      updateMeta("cardio", next);
+                    }}
+                    onCreateExercise={async (newName) => {
+                      await onAddExercise(newName, "cardio");
+                      updateMeta("cardio", [...meta.cardio, newName]);
+                    }}
+                  />
+                </div>
               );
             })}
           </div>
@@ -588,8 +641,8 @@ function WorkoutTemplateEditor({
   }
 
   return (
-    <div className="border border-gray-100 rounded-lg p-3">
-      <p className="text-xs font-medium text-gray-700 mb-2">{label}</p>
+    <div>
+      <p className="text-xs font-medium text-gray-500 mb-1">{label}</p>
       {exercises.length === 0 ? (
         <p className="text-xs text-gray-400 mb-2">No exercises yet</p>
       ) : (

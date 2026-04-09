@@ -35,6 +35,11 @@ export interface WorkoutSet {
 export type ActivityType = string;
 export type GymType = string;
 
+export interface WorkoutMeta {
+  warmup: string[];
+  cardio: string[];
+}
+
 export interface Plan {
   id: string;
   user_id: string;
@@ -43,8 +48,10 @@ export interface Plan {
   end_date: string;
   gym_schedule: Record<string, GymType>;
   prep_schedule: Record<string, ActivityType[]>;
-  /** Map of gym type code → ordered list of exercise names for that workout. */
+  /** Map of gym type code → ordered list of main lift names for that workout. */
   workout_templates: Record<string, string[]>;
+  /** Map of gym type code → warmup + cardio lists for that workout. */
+  workout_meta: Record<string, WorkoutMeta>;
   created_at: string;
   updated_at: string;
 }
