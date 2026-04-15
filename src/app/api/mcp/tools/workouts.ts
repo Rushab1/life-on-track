@@ -17,7 +17,7 @@ export function registerWorkoutTools(
 ) {
   server.tool(
     "log_workout",
-    "Log or update workout sets for a date. Always batch — pass an array of sets. Each set may be an INSERT (no id) or an UPDATE (id = existing workout_set.id). Exercise names are validated against the exercises table; if any are unknown the entire request is rejected with suggestions. Use manage_exercise to add new exercise names to the catalog.",
+    "Log or update workout sets for a date. Always batch — pass an array of sets. Each set may be an INSERT (no id) or an UPDATE (id = existing workout_set.id). Notes default to append mode on updates — new text is added after existing notes. Use notes_mode='write' to replace. Exercise names are validated against the exercises table; if any are unknown the entire request is rejected with suggestions. Use manage_exercise to add new exercise names to the catalog.",
     {
       date: dateSchema.describe("Date in YYYY-MM-DD format"),
       sets: z
@@ -58,6 +58,11 @@ export function registerWorkoutTools(
               .nullable()
               .optional()
               .describe("Notes for this set. Pass null to clear."),
+            notes_mode: z
+              .enum(["append", "write"])
+              .default("append")
+              .optional()
+              .describe("'append' (default) adds to existing notes; 'write' replaces them entirely."),
           }),
         )
         .min(1)
@@ -91,15 +96,25 @@ export function registerWorkoutTools(
 
       // Split inserts vs updates
       const inserts: Record<string, unknown>[] = [];
-      const updates: { id: string; patch: Record<string, unknown> }[] = [];
+      const updates: { id: string; patch: Record<string, unknown>; appendNotes?: string }[] = [];
       for (const r of resolved) {
         if (r.orig.id) {
           const patch: Record<string, unknown> = { exercise: r.name };
           if (r.orig.reps !== undefined) patch.reps = r.orig.reps;
           if (r.orig.weight_lbs !== undefined) patch.weight_lbs = r.orig.weight_lbs;
           if (r.orig.duration_mins !== undefined) patch.duration_mins = r.orig.duration_mins;
-          if (r.orig.notes !== undefined) patch.notes = r.orig.notes;
-          updates.push({ id: r.orig.id, patch });
+          const noteMode = r.orig.notes_mode ?? "append";
+          if (r.orig.notes !== undefined) {
+            if (noteMode === "append" && r.orig.notes) {
+              // Defer — we'll fetch existing notes per-update below
+              updates.push({ id: r.orig.id, patch, appendNotes: r.orig.notes });
+            } else {
+              patch.notes = r.orig.notes;
+              updates.push({ id: r.orig.id, patch });
+            }
+          } else {
+            updates.push({ id: r.orig.id, patch });
+          }
         } else {
           inserts.push({
             user_id: userId,
@@ -127,6 +142,17 @@ export function registerWorkoutTools(
 
       // Run updates (sequential — Supabase has no bulk update by id)
       for (const u of updates) {
+        if (u.appendNotes) {
+          // Fetch existing notes to append
+          const { data: existing } = await client
+            .from("workout_sets")
+            .select("notes")
+            .eq("user_id", userId)
+            .eq("id", u.id)
+            .maybeSingle();
+          const prev = (existing?.notes as string | null) ?? null;
+          u.patch.notes = prev ? `${prev}\n${u.appendNotes}` : u.appendNotes;
+        }
         const { error } = await client
           .from("workout_sets")
           .update(u.patch)

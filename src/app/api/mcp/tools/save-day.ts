@@ -17,7 +17,7 @@ export function registerSaveDayTool(
 ) {
   server.tool(
     "save_day",
-    "Upsert daily log + activity state for a date in one call. Set pain_level / notes (daily log). Per activity: completed (bool, marks complete/incomplete), note (string, adds note), delete (bool, removes the completion row entirely). clear_log=true deletes the daily_logs row for the date. All activity codes are validated; if any are unknown the whole request is rejected.",
+    "Upsert daily log + activity state for a date in one call. Set pain_level / notes (daily log). Notes default to append mode — new text is added after existing notes. Use notes_mode='write' to replace. Per activity: completed (bool, marks complete/incomplete), note (string, adds note — append by default, set note_mode='write' to replace), delete (bool, removes the completion row entirely). clear_log=true deletes the daily_logs row for the date. All activity codes are validated; if any are unknown the whole request is rejected.",
     {
       date: dateSchema.describe("Date in YYYY-MM-DD format"),
       pain_level: z
@@ -31,6 +31,11 @@ export function registerSaveDayTool(
         .max(5000)
         .optional()
         .describe("Free-text daily notes"),
+      notes_mode: z
+        .enum(["append", "write"])
+        .default("append")
+        .optional()
+        .describe("'append' (default) adds to existing notes; 'write' replaces them entirely."),
       activities: z
         .array(
           z.object({
@@ -47,6 +52,11 @@ export function registerSaveDayTool(
               .max(5000)
               .optional()
               .describe("Note to attach to this activity."),
+            note_mode: z
+              .enum(["append", "write"])
+              .default("append")
+              .optional()
+              .describe("'append' (default) adds to existing note; 'write' replaces it entirely."),
             delete: z
               .boolean()
               .optional()
@@ -61,7 +71,8 @@ export function registerSaveDayTool(
         .optional()
         .describe("If true, delete the daily_logs row for this date."),
     },
-    async ({ date, pain_level, notes, activities, clear_log }) => {
+    async ({ date, pain_level, notes, notes_mode, activities, clear_log }) => {
+      const effectiveNotesMode = notes_mode ?? "append";
       const messages: string[] = [];
 
       // 1) Daily log clear
@@ -89,7 +100,21 @@ export function registerSaveDayTool(
           updated_at: new Date().toISOString(),
         };
         if (pain_level !== undefined) upsertData.pain_level = pain_level;
-        if (notes !== undefined) upsertData.notes = notes || null;
+        if (notes !== undefined) {
+          if (effectiveNotesMode === "append" && notes) {
+            // Fetch existing notes to append to
+            const { data: existing } = await client
+              .from("daily_logs")
+              .select("notes")
+              .eq("user_id", userId)
+              .eq("date", date)
+              .maybeSingle();
+            const prev = existing?.notes as string | null;
+            upsertData.notes = prev ? `${prev}\n${notes}` : notes;
+          } else {
+            upsertData.notes = notes || null;
+          }
+        }
 
         const { error } = await client
           .from("daily_logs")
@@ -135,16 +160,31 @@ export function registerSaveDayTool(
 
         const upsertRows: Record<string, unknown>[] = [];
         const deleteCodes: string[] = [];
+
+        // Pre-fetch existing activity notes for append mode
+        const appendCodes = resolved
+          .filter((r) => !r.orig.delete && r.orig.note && (r.orig.note_mode ?? "append") === "append")
+          .map((r) => r.code);
+        let existingActivityNotes: Record<string, string> = {};
+        if (appendCodes.length > 0) {
+          const { data: existingRows } = await client
+            .from("activity_completions")
+            .select("activity_type, notes")
+            .eq("user_id", userId)
+            .eq("date", date)
+            .in("activity_type", appendCodes);
+          if (existingRows) {
+            for (const row of existingRows) {
+              if (row.notes) existingActivityNotes[row.activity_type] = row.notes;
+            }
+          }
+        }
+
         for (const r of resolved) {
           if (r.orig.delete) {
             deleteCodes.push(r.code);
             continue;
           }
-          // Fetch existing only if we need to preserve unchanged fields.
-          // Upsert row only includes fields we want to change: completed, notes,
-          // plus identity (user_id, date, activity_type).
-          // When both completed and note are omitted we still touch the row so
-          // caller can confirm existence.
           const row: Record<string, unknown> = {
             user_id: userId,
             date,
@@ -152,7 +192,15 @@ export function registerSaveDayTool(
           };
           if (r.orig.completed !== undefined) row.completed = r.orig.completed;
           else row.completed = true; // default: treat naked code as "completed"
-          if (r.orig.note !== undefined) row.notes = r.orig.note || null;
+          if (r.orig.note !== undefined) {
+            const noteMode = r.orig.note_mode ?? "append";
+            if (noteMode === "append" && r.orig.note) {
+              const prev = existingActivityNotes[r.code];
+              row.notes = prev ? `${prev}\n${r.orig.note}` : r.orig.note;
+            } else {
+              row.notes = r.orig.note || null;
+            }
+          }
           upsertRows.push(row);
         }
 
