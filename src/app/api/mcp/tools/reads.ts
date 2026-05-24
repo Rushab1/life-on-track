@@ -211,7 +211,7 @@ export function registerReadTools(
 
   server.tool(
     "get_history",
-    "Get history across a date range. Mode A (range summary): provide start_date and/or end_date (default: last 7 days) — returns avg pain, activity completion rates, workout days, and total exercises. Mode B (progressive overload): provide exercises (and optionally before_date, default today) — returns the most recent session per exercise before that date.",
+    "Get history across a date range. Mode A (range summary): provide start_date and/or end_date (default: last 7 days) — returns avg pain, activity completion rates, workout days, and total exercises. Mode B (progressive overload): provide exercises (and optionally before_date, default today) — returns the most recent sessions per exercise before that date. Use `sessions` to control how many recent sessions per exercise are returned (default 3).",
     {
       start_date: dateSchema
         .optional()
@@ -227,8 +227,17 @@ export function registerReadTools(
       before_date: dateSchema
         .optional()
         .describe("Only include sessions strictly before this date (Mode B). Defaults to today."),
+      sessions: z
+        .number()
+        .int()
+        .min(1)
+        .max(20)
+        .optional()
+        .describe(
+          "Mode B: number of most recent sessions (distinct dates) to return per exercise. Defaults to 3.",
+        ),
     },
-    async ({ start_date, end_date, exercises, before_date }) => {
+    async ({ start_date, end_date, exercises, before_date, sessions }) => {
       // Mode B: progressive overload lookup
       if (exercises && exercises.length > 0) {
         const cutoff =
@@ -257,11 +266,12 @@ export function registerReadTools(
           };
         }
 
-        const latestDate: Record<string, string> = {};
-        for (const row of data) {
-          if (!latestDate[row.exercise]) latestDate[row.exercise] = row.date;
-        }
+        const maxSessions = sessions ?? 3;
 
+        // data is ordered date desc, created_at asc, so each exercise's rows
+        // arrive in descending contiguous date groups. Keep rows until we've
+        // collected maxSessions distinct dates for that exercise.
+        const datesSeen: Record<string, string[]> = {};
         const result: Record<
           string,
           {
@@ -272,15 +282,18 @@ export function registerReadTools(
           }[]
         > = {};
         for (const row of data) {
-          if (row.date === latestDate[row.exercise]) {
-            if (!result[row.exercise]) result[row.exercise] = [];
-            result[row.exercise].push({
-              reps: row.reps,
-              weight_lbs: row.weight_lbs,
-              duration_mins: row.duration_mins,
-              date: row.date,
-            });
+          const dates = datesSeen[row.exercise] ?? (datesSeen[row.exercise] = []);
+          if (!dates.includes(row.date)) {
+            if (dates.length >= maxSessions) continue;
+            dates.push(row.date);
           }
+          if (!result[row.exercise]) result[row.exercise] = [];
+          result[row.exercise].push({
+            reps: row.reps,
+            weight_lbs: row.weight_lbs,
+            duration_mins: row.duration_mins,
+            date: row.date,
+          });
         }
         return {
           content: [
