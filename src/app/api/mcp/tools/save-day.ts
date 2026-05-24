@@ -165,7 +165,7 @@ export function registerSaveDayTool(
         const appendCodes = resolved
           .filter((r) => !r.orig.delete && r.orig.note && (r.orig.note_mode ?? "append") === "append")
           .map((r) => r.code);
-        let existingActivityNotes: Record<string, string> = {};
+        const existingActivityNotes: Record<string, string> = {};
         if (appendCodes.length > 0) {
           const { data: existingRows } = await client
             .from("activity_completions")
