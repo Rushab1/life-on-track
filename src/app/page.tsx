@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import AuthForm from "@/components/AuthForm";
 import DayLogger from "@/components/DayLogger";
@@ -19,5 +20,9 @@ export default function Home() {
     return <AuthForm />;
   }
 
-  return <DayLogger userId={user.id} onSignOut={signOut} />;
+  return (
+    <Suspense>
+      <DayLogger userId={user.id} onSignOut={signOut} />
+    </Suspense>
+  );
 }

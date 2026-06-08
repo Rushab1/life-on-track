@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { toDateString, addDays, isSameDay } from "@/lib/dates";
 import { getActivitiesForDate, isWorkoutDay, getGymType } from "@/config/schedule";
 import { useDailyLog } from "@/hooks/useDailyLog";
@@ -32,6 +33,19 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
   const [selectedDate, setSelectedDate] = useState(today);
   const [tab, setTab] = useState<Tab>("day");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const google = searchParams.get("google");
+    if (google === "connected") {
+      setToast({ type: "success", message: "Google Calendar connected!" });
+      window.history.replaceState({}, "", "/");
+    } else if (google === "error") {
+      setToast({ type: "error", message: "Google Calendar connection failed. Try again." });
+      window.history.replaceState({}, "", "/");
+    }
+  }, [searchParams]);
 
   const dateStr = toDateString(selectedDate);
   const isToday = isSameDay(selectedDate, today);
@@ -127,6 +141,25 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
             </button>
           </div>
         </div>
+
+        {/* Toast */}
+        {toast && (
+          <div
+            className={`flex items-center justify-between px-4 py-2.5 rounded-lg mb-4 text-sm ${
+              toast.type === "success"
+                ? "bg-green-50 text-green-800"
+                : "bg-red-50 text-red-800"
+            }`}
+          >
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              className="ml-3 font-medium hover:opacity-70"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Date navigation */}
         <div className="flex items-center justify-between mb-4">
