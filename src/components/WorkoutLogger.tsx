@@ -85,15 +85,15 @@ export default function WorkoutLogger({
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-4 space-y-4">
-      <h3 className="text-sm font-medium text-gray-700">
+    <div className="card p-4 space-y-4">
+      <h3 className="text-sm font-medium text-stone-700">
         Workout — {gymLabel}
       </h3>
 
       {/* Warmup */}
       {meta.warmup.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Warmup</p>
+          <p className="text-xs font-medium text-stone-400 uppercase tracking-wide mb-1">Warmup</p>
           <div className="space-y-1">{renderAccordions(meta.warmup)}</div>
         </div>
       )}
@@ -101,7 +101,7 @@ export default function WorkoutLogger({
       {/* Main exercises */}
       {defaultExercises.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Exercises</p>
+          <p className="text-xs font-medium text-stone-400 uppercase tracking-wide mb-1">Exercises</p>
           <div className="space-y-1">{renderAccordions(defaultExercises)}</div>
         </div>
       )}
@@ -109,13 +109,13 @@ export default function WorkoutLogger({
       {/* Cardio */}
       {meta.cardio.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Cardio</p>
+          <p className="text-xs font-medium text-stone-400 uppercase tracking-wide mb-1">Cardio</p>
           <div className="space-y-1">{renderAccordions(meta.cardio)}</div>
         </div>
       )}
 
       {/* Add other exercise */}
-      <div className="pt-1 border-t border-gray-100">
+      <div className="pt-1 border-t border-stone-100">
         <select
           value={extraExercise}
           onChange={(e) => {
@@ -128,7 +128,7 @@ export default function WorkoutLogger({
               setExpanded((prev) => new Set(prev).add(e.target.value));
             }
           }}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+          className="input text-sm"
         >
           <option value="">+ Add other exercise...</option>
           {exercises
@@ -147,11 +147,11 @@ export default function WorkoutLogger({
               onChange={(e) => setNewExerciseName(e.target.value)}
               placeholder="Exercise name..."
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddExercise(); } }}
-              className="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="input flex-1 px-2 py-1.5 text-sm"
               autoFocus
             />
-            <button onClick={handleAddExercise} className="px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-800 transition-colors">Add</button>
-            <button onClick={() => { setAddingExercise(false); setNewExerciseName(""); }} className="px-3 py-1.5 text-gray-500 text-xs">Cancel</button>
+            <button onClick={handleAddExercise} className="btn btn-primary px-3 py-1.5 text-xs">Add</button>
+            <button onClick={() => { setAddingExercise(false); setNewExerciseName(""); }} className="btn btn-ghost px-3 py-1.5 text-xs">Cancel</button>
           </div>
         )}
 
@@ -191,7 +191,7 @@ function minSecToMins(min: string, sec: string): number | null {
   return m + s / 60;
 }
 
-const numInputClass = "px-2 py-1 border border-gray-200 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder-gray-300 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+const numInputClass = "input px-2 py-1 rounded-md text-sm border-stone-200 placeholder-stone-300 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
 /** A single editable set row — saved or pending. */
 function SetRow({
@@ -237,8 +237,8 @@ function SetRow({
   const isPending = !savedSet;
 
   return (
-    <div className={`flex items-center gap-1 px-1 py-0.5 rounded-lg ${savedSet ? "bg-green-50" : ""}`}>
-      <span className="text-xs text-gray-400 w-6 flex-shrink-0 text-center">{index + 1}</span>
+    <div className={`flex items-center gap-1 px-1 py-0.5 rounded-lg ${savedSet ? "bg-emerald-50" : ""}`}>
+      <span className="text-xs text-stone-400 w-6 flex-shrink-0 text-center">{index + 1}</span>
       <input
         type="text" inputMode="numeric" pattern="[0-9]*"
         placeholder={isPending ? (prefill?.reps?.toString() ?? "reps") : undefined}
@@ -247,7 +247,7 @@ function SetRow({
         onBlur={handleBlur}
         className={`flex-1 min-w-0 ${numInputClass}`}
       />
-      <span className="text-xs text-gray-300 flex-shrink-0">@</span>
+      <span className="text-xs text-stone-300 flex-shrink-0">@</span>
       <input
         type="text" inputMode="decimal" pattern="[0-9.]*"
         placeholder={isPending ? (prefill?.weight_lbs?.toString() ?? "lbs") : undefined}
@@ -265,7 +265,7 @@ function SetRow({
         onBlur={handleBlur}
         className={`w-8 flex-shrink-0 ${numInputClass}`}
       />
-      <span className="text-xs text-gray-300 flex-shrink-0">:</span>
+      <span className="text-xs text-stone-300 flex-shrink-0">:</span>
       <input
         type="text" inputMode="numeric" pattern="[0-9]*"
         placeholder={isPending ? (prefillDurSec || "s") : undefined}
@@ -276,16 +276,17 @@ function SetRow({
       />
       {/* Delete / confirm */}
       {saving ? (
-        <span className="text-[10px] text-gray-400 w-8 flex-shrink-0">…</span>
+        <span className="text-[10px] text-stone-400 w-8 flex-shrink-0">…</span>
       ) : confirmDelete ? (
         <div className="flex items-center gap-0.5 flex-shrink-0">
-          <button onClick={onRemove} className="text-[10px] text-red-500 font-medium">Del</button>
-          <button onClick={() => setConfirmDelete(false)} className="text-[10px] text-gray-400">✕</button>
+          <button onClick={onRemove} className="text-[10px] text-rose-500 font-medium">Del</button>
+          <button onClick={() => setConfirmDelete(false)} aria-label="Cancel delete" className="text-[10px] text-stone-400">✕</button>
         </div>
       ) : (
         <button
           onClick={() => savedSet ? setConfirmDelete(true) : onRemove()}
-          className="text-gray-400 hover:text-red-500 text-base leading-none w-5 text-center flex-shrink-0"
+          aria-label="Delete set"
+          className="text-stone-400 hover:text-rose-500 text-base leading-none w-5 text-center flex-shrink-0"
         >&times;</button>
       )}
     </div>
@@ -326,39 +327,39 @@ function ExerciseAccordion({
   const prefill = historySets[historySets.length - 1];
 
   return (
-    <div className="border border-gray-100 rounded-lg overflow-hidden">
+    <div className="border border-stone-100 rounded-lg overflow-hidden">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-stone-50 transition-colors"
       >
         <div className="flex items-center gap-2">
           <svg
-            className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`}
+            className={`w-4 h-4 text-stone-400 transition-transform ${isOpen ? "rotate-90" : ""}`}
             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
-          <span className="text-sm font-medium text-gray-800">{exercise}</span>
+          <span className="text-sm font-medium text-stone-800">{exercise}</span>
           {setCount > 0 && (
-            <span className="text-[10px] bg-gray-900 text-white px-1.5 py-0.5 rounded-full">{setCount}</span>
+            <span className="badge bg-indigo-600 text-white text-[10px]">{setCount}</span>
           )}
         </div>
         <div className="flex items-center gap-2">
           {!isOpen && histSummary && (
-            <span className="text-[10px] text-gray-400">last: {histSummary}</span>
+            <span className="text-[10px] text-stone-400">last: {histSummary}</span>
           )}
           {setCount > 0 && (
             confirmDelete ? (
               <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                 <button
                   onClick={() => { onRemoveAll(); setConfirmDelete(false); }}
-                  className="text-[10px] text-red-500 font-medium"
+                  className="text-[10px] text-rose-500 font-medium"
                 >
                   Delete all
                 </button>
                 <button
                   onClick={() => setConfirmDelete(false)}
-                  className="text-[10px] text-gray-400"
+                  className="text-[10px] text-stone-400"
                 >
                   Cancel
                 </button>
@@ -366,7 +367,7 @@ function ExerciseAccordion({
             ) : (
               <button
                 onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
-                className="text-[10px] text-gray-300 hover:text-red-400 transition-colors"
+                className="text-[10px] text-stone-300 hover:text-rose-400 transition-colors"
               >
                 Delete
               </button>
@@ -380,12 +381,12 @@ function ExerciseAccordion({
           {/* Column headers */}
           <div className="flex items-center gap-1 px-1 pb-0.5">
             <span className="w-6" />
-            <span className="flex-1 text-[10px] text-gray-400 text-center">reps</span>
+            <span className="flex-1 text-[10px] text-stone-400 text-center">reps</span>
             <span className="w-3" />
-            <span className="flex-1 text-[10px] text-gray-400 text-center">lbs</span>
-            <span className="w-8 text-[10px] text-gray-400 text-center">min</span>
+            <span className="flex-1 text-[10px] text-stone-400 text-center">lbs</span>
+            <span className="w-8 text-[10px] text-stone-400 text-center">min</span>
             <span className="w-3" />
-            <span className="w-8 text-[10px] text-gray-400 text-center">sec</span>
+            <span className="w-8 text-[10px] text-stone-400 text-center">sec</span>
             <span className="w-5" />
           </div>
 
@@ -415,7 +416,7 @@ function ExerciseAccordion({
 
           {/* History preview */}
           {historySets.length > 0 && (
-            <div className="text-[10px] text-gray-400 pt-1 pl-1">
+            <div className="text-[10px] text-stone-400 pt-1 pl-1">
               Last:{" "}
               {historySets.map((h, i) => (
                 <span key={i}>

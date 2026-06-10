@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { verifyState } from "@/lib/oauthState";
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
@@ -12,7 +13,9 @@ function getRedirectUri(req: Request): string {
 export async function GET(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
-  const userId = url.searchParams.get("state");
+  // state is HMAC-signed by /api/google/auth; reject forged callbacks that
+  // would attach an attacker's Google account to another user's id.
+  const userId = verifyState(url.searchParams.get("state"));
   const error = url.searchParams.get("error");
 
   if (error || !code || !userId) {

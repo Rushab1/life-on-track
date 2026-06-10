@@ -20,6 +20,8 @@ import Calendar from "./Calendar";
 import PlanManager from "./PlanManager";
 import WidgetConfigurator from "./WidgetConfigurator";
 import GoogleConnector from "./GoogleConnector";
+import OuraConnector from "./OuraConnector";
+import OuraPanel from "./OuraPanel";
 import McpTokenManager from "./McpTokenManager";
 
 interface DayLoggerProps {
@@ -46,18 +48,33 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
       setToast({ type: "error", message: "Google Calendar connection failed. Try again." });
       window.history.replaceState({}, "", "/");
     }
+    const oura = searchParams.get("oura");
+    if (oura === "connected") {
+      setToast({ type: "success", message: "Oura Ring connected!" });
+      window.history.replaceState({}, "", "/");
+    } else if (oura === "error") {
+      setToast({ type: "error", message: "Oura connection failed. Try again." });
+      window.history.replaceState({}, "", "/");
+    } else if (oura === "unconfigured") {
+      setToast({ type: "error", message: "Oura is not configured on the server (missing OURA_CLIENT_ID)." });
+      window.history.replaceState({}, "", "/");
+    }
   }, [searchParams]);
 
   // Pull the latest Google Calendar events once per session so the day view
   // stays fresh between daily cron runs. Fire-and-forget; bumps calRefresh so
   // the events panel reloads when the import lands.
   const [calRefresh, setCalRefresh] = useState(0);
+  const [ouraRefresh, setOuraRefresh] = useState(0);
   const pulledRef = useRef(false);
   useEffect(() => {
     if (pulledRef.current) return;
     pulledRef.current = true;
     fetch("/api/google/pull", { method: "POST" })
       .then(() => setCalRefresh((k) => k + 1))
+      .catch(() => {});
+    fetch("/api/oura/sync", { method: "POST" })
+      .then(() => setOuraRefresh((k) => k + 1))
       .catch(() => {});
   }, []);
 
@@ -134,23 +151,25 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-[600px] mx-auto px-4 py-6">
+    <div className="min-h-screen">
+      <div className="max-w-xl md:max-w-2xl mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold text-gray-900">Life on Track</h1>
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" aria-hidden="true" />
+            <h1 className="text-xl font-bold tracking-tight text-stone-900">
+              Life on Track
+            </h1>
+          </div>
           <div className="flex items-center gap-3">
             {/* Autosave status */}
             {dailyLog.saving && (
-              <span className="text-xs text-gray-400">Saving...</span>
+              <span className="text-xs text-stone-400">Saving...</span>
             )}
             {dailyLog.saved && (
-              <span className="text-xs text-green-500">Saved</span>
+              <span className="text-xs text-emerald-600">Saved</span>
             )}
-            <button
-              onClick={onSignOut}
-              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-            >
+            <button onClick={onSignOut} className="btn btn-ghost text-sm">
               Sign out
             </button>
           </div>
@@ -159,10 +178,11 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
         {/* Toast */}
         {toast && (
           <div
-            className={`flex items-center justify-between px-4 py-2.5 rounded-lg mb-4 text-sm ${
+            role="status"
+            className={`flex items-center justify-between px-4 py-2.5 rounded-xl mb-4 text-sm border ${
               toast.type === "success"
-                ? "bg-green-50 text-green-800"
-                : "bg-red-50 text-red-800"
+                ? "bg-emerald-50 text-emerald-800 border-emerald-200/70"
+                : "bg-rose-50 text-rose-800 border-rose-200/70"
             }`}
           >
             <span>{toast.message}</span>
@@ -179,32 +199,34 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={goToPrevDay}
-            className="p-2 text-gray-500 hover:text-gray-900 transition-colors"
+            aria-label="Previous day"
+            className="p-2 rounded-full text-stone-500 hover:text-stone-900 hover:bg-stone-200/70 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <div className="text-center">
-            <p className="text-sm font-medium text-gray-900">{dayName}</p>
-            <p className="text-xs text-gray-500">{dateDisplay}</p>
+            <p className="text-sm font-semibold text-stone-900">{dayName}</p>
+            <p className="text-xs text-stone-500">{dateDisplay}</p>
             {!isToday && (
               <button
                 onClick={goToToday}
-                className="text-xs text-gray-400 hover:text-gray-700 mt-0.5 transition-colors"
+                className="text-xs text-indigo-600 hover:text-indigo-700 font-medium mt-0.5 transition-colors"
               >
                 Jump to today
               </button>
             )}
             {activePlan && (
-              <p className="text-[10px] text-gray-400 mt-0.5">
+              <p className="text-[10px] text-stone-400 mt-0.5">
                 {activePlan.name}
               </p>
             )}
           </div>
           <button
             onClick={goToNextDay}
-            className="p-2 text-gray-500 hover:text-gray-900 transition-colors"
+            aria-label="Next day"
+            className="p-2 rounded-full text-stone-500 hover:text-stone-900 hover:bg-stone-200/70 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -213,15 +235,15 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6">
+        <div className="flex gap-1 bg-stone-200/70 rounded-xl p-1 mb-6">
           {(["day", "calendar", "plans", "settings"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
                 tab === t
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500"
+                  ? "bg-white text-indigo-700 shadow-sm"
+                  : "text-stone-500 hover:text-stone-700"
               }`}
             >
               {t === "day" ? "Day" : t === "calendar" ? "Calendar" : t === "plans" ? "Plan & Customize" : "Settings"}
@@ -239,7 +261,10 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
 
         {tab === "settings" && (
           <div className="space-y-8">
-            <GoogleConnector userId={userId} />
+            <div className="space-y-3">
+              <GoogleConnector userId={userId} />
+              <OuraConnector userId={userId} />
+            </div>
             <McpTokenManager userId={userId} />
           </div>
         )}
@@ -267,14 +292,14 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
         {tab === "day" && (
           <div className="space-y-4">
             {/* Today's gym + swap control */}
-            <div className="flex items-center justify-between bg-white rounded-2xl shadow-sm px-4 py-2.5">
+            <div className="card flex items-center justify-between px-4 py-2.5">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs text-gray-500">Today:</span>
-                <span className="text-sm font-medium text-gray-800 truncate">
+                <span className="text-xs text-stone-500">Today:</span>
+                <span className="text-sm font-medium text-stone-800 truncate">
                   {gymLabel}
                 </span>
                 {dayOverride && (
-                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">
+                  <span className="badge bg-amber-100 text-amber-700">
                     Swapped
                   </span>
                 )}
@@ -283,12 +308,12 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
                 <button
                   type="button"
                   onClick={() => setShowSwap((s) => !s)}
-                  className="text-xs text-gray-500 hover:text-gray-800 transition-colors"
+                  className="text-xs text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
                 >
                   Swap workout
                 </button>
                 {showSwap && (
-                  <div className="absolute right-0 top-6 z-10 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[160px] py-1">
+                  <div className="absolute right-0 top-6 z-10 bg-white border border-stone-200 rounded-xl shadow-lg min-w-[160px] py-1 overflow-hidden">
                     {gymOptions.map((opt) => (
                       <button
                         key={opt.value}
@@ -297,21 +322,21 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
                           await setOverride(opt.value);
                           setShowSwap(false);
                         }}
-                        className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                        className="block w-full text-left px-3 py-1.5 text-xs text-stone-700 hover:bg-stone-50"
                       >
                         {opt.label}
                       </button>
                     ))}
                     {dayOverride && (
                       <>
-                        <div className="border-t border-gray-100 my-1" />
+                        <div className="border-t border-stone-100 my-1" />
                         <button
                           type="button"
                           onClick={async () => {
                             await setOverride(null);
                             setShowSwap(false);
                           }}
-                          className="block w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-gray-50"
+                          className="block w-full text-left px-3 py-1.5 text-xs text-rose-500 hover:bg-rose-50"
                         >
                           Clear override
                         </button>
@@ -321,6 +346,8 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
                 )}
               </div>
             </div>
+
+            <OuraPanel userId={userId} dateStr={dateStr} refresh={ouraRefresh} />
 
             <PainSlider
               value={dailyLog.painLevel}
@@ -366,13 +393,13 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
                   <div className="flex gap-2">
                     <button
                       onClick={handleDeleteDay}
-                      className="flex-1 py-2.5 bg-red-600 text-white rounded-2xl text-sm font-medium hover:bg-red-700 transition-colors"
+                      className="btn btn-danger flex-1 py-2.5"
                     >
                       Confirm delete
                     </button>
                     <button
                       onClick={() => setShowDeleteConfirm(false)}
-                      className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-2xl text-sm font-medium hover:bg-gray-50 transition-colors"
+                      className="btn btn-secondary flex-1 py-2.5"
                     >
                       Cancel
                     </button>
@@ -380,7 +407,7 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
                 ) : (
                   <button
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="w-full py-2.5 text-red-500 text-sm hover:text-red-700 transition-colors"
+                    className="w-full py-2.5 text-rose-500 text-sm hover:text-rose-700 transition-colors"
                   >
                     Delete this day&apos;s log
                   </button>

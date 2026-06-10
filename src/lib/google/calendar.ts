@@ -215,21 +215,32 @@ export async function pullFromCalendar(
   if (!token) return { imported: 0, removed: 0 };
   const { accessToken, calendarId } = token;
 
-  const params = new URLSearchParams({
-    timeMin: `${startDate}T00:00:00Z`,
-    timeMax: `${endDate}T23:59:59Z`,
-    singleEvents: "true",
-    orderBy: "startTime",
-    maxResults: "2500",
-  });
-  const res = await fetch(
-    `${CAL}/${encodeURIComponent(calendarId)}/events?${params}`,
-    { headers: { Authorization: `Bearer ${accessToken}` } },
-  );
-  if (!res.ok) return { imported: 0, removed: 0 };
-
-  const body = (await res.json()) as { items?: GoogleApiEvent[] };
-  const items = body.items ?? [];
+  const items: GoogleApiEvent[] = [];
+  let pageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({
+      timeMin: `${startDate}T00:00:00Z`,
+      timeMax: `${endDate}T23:59:59Z`,
+      singleEvents: "true",
+      orderBy: "startTime",
+      maxResults: "2500",
+    });
+    if (pageToken) params.set("pageToken", pageToken);
+    const res = await fetch(
+      `${CAL}/${encodeURIComponent(calendarId)}/events?${params}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    if (!res.ok) {
+      console.error(`pullFromCalendar: events list failed (${res.status})`);
+      return { imported: 0, removed: 0 };
+    }
+    const body = (await res.json()) as {
+      items?: GoogleApiEvent[];
+      nextPageToken?: string;
+    };
+    items.push(...(body.items ?? []));
+    pageToken = body.nextPageToken;
+  } while (pageToken);
 
   const seen: string[] = [];
   const rows: Record<string, unknown>[] = [];
@@ -247,7 +258,11 @@ export async function pullFromCalendar(
     if (allDay) {
       date = it.start!.date!;
     } else if (it.start?.dateTime) {
-      date = toDateString(new Date(it.start.dateTime));
+      // Google sends RFC3339 with the event's own offset; the first 10 chars
+      // are the wall-clock date where the event happens. Converting through
+      // Date would re-interpret it in the server's timezone (UTC on Vercel)
+      // and shift evening/morning events to the wrong day.
+      date = it.start.dateTime.slice(0, 10);
       startTime = it.start.dateTime;
       endTime = it.end?.dateTime ?? null;
     } else {

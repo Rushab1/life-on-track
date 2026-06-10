@@ -56,21 +56,23 @@ export default function Calendar({
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-4">
+    <div className="card p-4">
       {/* Month navigation */}
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={prevMonth}
-          className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors"
+          aria-label="Previous month"
+          className="p-1.5 rounded-full text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition-colors"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <h3 className="text-sm font-semibold text-gray-900">{monthLabel}</h3>
+        <h3 className="text-sm font-semibold text-stone-900">{monthLabel}</h3>
         <button
           onClick={nextMonth}
-          className="p-1.5 text-gray-500 hover:text-gray-900 transition-colors"
+          aria-label="Next month"
+          className="p-1.5 rounded-full text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition-colors"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -81,7 +83,7 @@ export default function Calendar({
       {/* Day headers */}
       <div className="grid grid-cols-7 gap-1 mb-1">
         {DAY_NAMES.map((d) => (
-          <div key={d} className="text-center text-xs font-medium text-gray-400 py-1">
+          <div key={d} className="text-center text-xs font-medium text-stone-400 py-1">
             {d}
           </div>
         ))}
@@ -106,15 +108,15 @@ export default function Calendar({
               onClick={() => onSelectDate(cellDate)}
               className={`relative aspect-square flex items-center justify-center text-sm rounded-lg transition-colors ${
                 isSelected
-                  ? "bg-gray-900 text-white"
+                  ? "bg-indigo-600 text-white"
                   : isToday
-                    ? "bg-gray-100 text-gray-900 font-semibold"
-                    : "text-gray-700 hover:bg-gray-50"
+                    ? "ring-1 ring-inset ring-indigo-600 text-indigo-700 font-semibold"
+                    : "text-stone-700 hover:bg-stone-50"
               }`}
             >
               {day}
               {hasLog && !isSelected && (
-                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-gray-900" />
+                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-indigo-600" />
               )}
               {hasLog && isSelected && (
                 <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white" />

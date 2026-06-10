@@ -23,7 +23,14 @@ export function useGoogleConnection(userId: string) {
   }, [load]);
 
   async function disconnect() {
-    await supabase.from("google_tokens").delete().eq("user_id", userId);
+    // Server route revokes the grant at Google, then deletes the row.
+    // Fall back to a direct delete if the route is unreachable.
+    try {
+      const res = await fetch("/api/google/disconnect", { method: "POST" });
+      if (!res.ok) throw new Error(`disconnect failed: ${res.status}`);
+    } catch {
+      await supabase.from("google_tokens").delete().eq("user_id", userId);
+    }
     setConnected(false);
   }
 

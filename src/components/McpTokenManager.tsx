@@ -112,8 +112,8 @@ export default function McpTokenManager({ userId }: { userId: string }) {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-1">MCP Tokens</h3>
-        <p className="text-sm text-gray-500">
+        <h3 className="text-lg font-semibold text-stone-900 mb-1">MCP Tokens</h3>
+        <p className="text-sm text-stone-500">
           Connect Life on Track to Claude Desktop or Claude Code.
         </p>
       </div>
@@ -126,15 +126,12 @@ export default function McpTokenManager({ userId }: { userId: string }) {
           value={newTokenName}
           onChange={(e) => setNewTokenName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && generateToken()}
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm
-                     focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="input flex-1 text-sm"
         />
         <button
           onClick={generateToken}
           disabled={generating || !newTokenName.trim()}
-          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg
-                     hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed
-                     transition-colors"
+          className="btn btn-primary"
         >
           {generating ? "Generating..." : "Generate"}
         </button>
@@ -142,7 +139,7 @@ export default function McpTokenManager({ userId }: { userId: string }) {
 
       {/* Show newly generated token */}
       {generatedToken && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+        <div className="p-4 bg-amber-50 border border-amber-200/70 rounded-xl space-y-3">
           <p className="text-sm font-medium text-amber-800">
             Save this token now — it won&apos;t be shown again!
           </p>
@@ -156,22 +153,19 @@ export default function McpTokenManager({ userId }: { userId: string }) {
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
               }}
-              className="px-3 py-1.5 text-sm bg-amber-100 hover:bg-amber-200 rounded
-                         transition-colors"
+              className="btn px-3 py-1.5 bg-amber-100 text-amber-800 hover:bg-amber-200"
             >
               {copied ? "Copied!" : "Copy Token"}
             </button>
             <button
               onClick={copyConfig}
-              className="px-3 py-1.5 text-sm bg-amber-100 hover:bg-amber-200 rounded
-                         transition-colors"
+              className="btn px-3 py-1.5 bg-amber-100 text-amber-800 hover:bg-amber-200"
             >
               Copy Claude Config
             </button>
             <button
               onClick={() => setGeneratedToken(null)}
-              className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800
-                         transition-colors ml-auto"
+              className="btn btn-ghost px-3 py-1.5 ml-auto"
             >
               Dismiss
             </button>
@@ -181,19 +175,19 @@ export default function McpTokenManager({ userId }: { userId: string }) {
 
       {/* Token list */}
       {loading ? (
-        <p className="text-sm text-gray-400">Loading tokens...</p>
+        <p className="text-sm text-stone-400">Loading tokens...</p>
       ) : tokens.length === 0 ? (
-        <p className="text-sm text-gray-400">No active tokens.</p>
+        <p className="text-sm text-stone-400">No active tokens.</p>
       ) : (
         <div className="space-y-2">
           {tokens.map((token) => (
             <div
               key={token.id}
-              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+              className="flex items-center justify-between p-3 bg-stone-50 rounded-xl border border-stone-200/70"
             >
               <div>
-                <p className="text-sm font-medium text-gray-900">{token.name}</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-sm font-medium text-stone-900">{token.name}</p>
+                <p className="text-xs text-stone-500">
                   Created {new Date(token.created_at).toLocaleDateString()}
                   {token.last_used_at && (
                     <> · Last used {new Date(token.last_used_at).toLocaleDateString()}</>
@@ -202,8 +196,7 @@ export default function McpTokenManager({ userId }: { userId: string }) {
               </div>
               <button
                 onClick={() => revokeToken(token.id)}
-                className="px-3 py-1 text-sm text-red-600 hover:text-red-700 hover:bg-red-50
-                           rounded transition-colors"
+                className="btn btn-danger-ghost px-3 py-1"
               >
                 Revoke
               </button>

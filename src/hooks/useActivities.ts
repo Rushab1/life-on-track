@@ -12,6 +12,11 @@ export function useActivities(userId: string, dateStr: string) {
     Record<ActivityType, string>
   >({} as Record<ActivityType, string>);
   const noteDebounceRefs = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // Mirror of `completions` so debounced note saves read the value at fire
+  // time, not the value captured when the user started typing — otherwise a
+  // toggle during the 1.5s debounce gets silently reverted by the note save.
+  const completionsRef = useRef(completions);
+  completionsRef.current = completions;
 
   const load = useCallback(async () => {
     setCompletions({} as Record<ActivityType, boolean>);
@@ -73,7 +78,7 @@ export function useActivities(userId: string, dateStr: string) {
           user_id: userId,
           date: dateStr,
           activity_type: activity,
-          completed: completions[activity] ?? false,
+          completed: completionsRef.current[activity] ?? false,
           notes: text || null,
         },
         { onConflict: "user_id,date,activity_type" }

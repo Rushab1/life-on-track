@@ -26,7 +26,7 @@ export function registerReadTools(
 ) {
   server.tool(
     "get_day",
-    "Get everything for a single date in one call: pain level, notes, active plan (with exercise templates), any day override, scheduled + ad-hoc activities, workout sets grouped by exercise, widget values, and life events. This is the canonical starting tool — call it first when the user asks about a day.",
+    "Get everything for a single date in one call: pain level, notes, active plan (with exercise templates), any day override, scheduled + ad-hoc activities, workout sets grouped by exercise, widget values, life events, Google Calendar events, and Oura Ring metrics (sleep/readiness/activity scores, HRV, resting HR, steps). This is the canonical starting tool — call it first when the user asks about a day.",
     { date: dateSchema.describe("Date in YYYY-MM-DD format") },
     async ({ date }) => {
       const [
@@ -38,6 +38,7 @@ export function registerReadTools(
         eventsRes,
         widgetRes,
         calendarRes,
+        ouraRes,
       ] = await Promise.all([
         client
           .from("daily_logs")
@@ -88,6 +89,14 @@ export function registerReadTools(
           .eq("date", date)
           .order("all_day", { ascending: false })
           .order("start_time"),
+        client
+          .from("oura_daily")
+          .select(
+            "sleep_score, readiness_score, activity_score, total_sleep_minutes, sleep_efficiency, avg_hrv, resting_hr, temperature_deviation, steps, active_calories, total_calories",
+          )
+          .eq("user_id", userId)
+          .eq("date", date)
+          .maybeSingle(),
       ]);
 
       const dailyLog = dailyLogRes.data as DailyLog | null;
@@ -227,6 +236,7 @@ export function registerReadTools(
         widget_values: widgetValues,
         events: lifeEvents,
         calendar_events: calendarEvents,
+        oura: ouraRes.data ?? null,
       };
       return {
         content: [

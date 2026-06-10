@@ -44,14 +44,24 @@ export async function getValidAccessToken(
         grant_type: "refresh_token",
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // invalid_grant means the user revoked access (or the refresh token
+      // expired). Drop the row so the UI shows "not connected" instead of
+      // silently failing every sync forever.
+      const errBody = await res.text().catch(() => "");
+      console.error(`Google token refresh failed (${res.status}): ${errBody}`);
+      if (res.status === 400 && errBody.includes("invalid_grant")) {
+        await client.from("google_tokens").delete().eq("user_id", userId);
+      }
+      return null;
+    }
 
     const refreshed = (await res.json()) as {
       access_token: string;
       expires_in: number;
     };
     accessToken = refreshed.access_token;
-    await client
+    const { error: updateError } = await client
       .from("google_tokens")
       .update({
         access_token: accessToken,
@@ -61,6 +71,9 @@ export async function getValidAccessToken(
         updated_at: new Date().toISOString(),
       })
       .eq("user_id", userId);
+    if (updateError) {
+      console.error("Google token refresh: failed to persist new token", updateError);
+    }
   }
 
   return { accessToken, calendarId };

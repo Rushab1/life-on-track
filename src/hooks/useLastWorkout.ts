@@ -60,6 +60,10 @@ export function useLastWorkout(
       }
       setLastSets(result);
     }
+    // `exercises` is intentionally represented by `exerciseKey` — the array
+    // gets a new identity every render, so depending on it directly would
+    // refetch on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, dateStr, exerciseKey]);
 
   useEffect(() => {

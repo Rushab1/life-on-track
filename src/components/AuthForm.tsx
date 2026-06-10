@@ -30,25 +30,25 @@ export default function AuthForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-gray-900 text-center mb-8">
-          Life on Track
-        </h1>
-        <div className="bg-white rounded-2xl shadow-sm p-6">
+        <div className="flex items-center justify-center gap-2 mb-8">
+          <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" aria-hidden="true" />
+          <h1 className="text-2xl font-bold tracking-tight text-stone-900 text-center">
+            Life on Track
+          </h1>
+        </div>
+        <div className="card p-6">
           {sent ? (
             <div className="text-center">
-              <p className="text-gray-900 font-medium mb-2">Check your email</p>
-              <p className="text-gray-500 text-sm">
+              <p className="text-stone-900 font-medium mb-2">Check your email</p>
+              <p className="text-stone-500 text-sm">
                 We sent a magic link to <strong>{email}</strong>
               </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit}>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
+              <label htmlFor="email" className="label">
                 Email
               </label>
               <input
@@ -58,15 +58,15 @@ export default function AuthForm() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent mb-4"
+                className="input mb-4"
               />
               {error && (
-                <p className="text-red-500 text-sm mb-4">{error}</p>
+                <p className="text-rose-500 text-sm mb-4">{error}</p>
               )}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2.5 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                className="btn btn-primary w-full py-2.5"
               >
                 {loading ? "Sending..." : "Send magic link"}
               </button>

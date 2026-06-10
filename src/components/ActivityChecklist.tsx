@@ -32,18 +32,20 @@ export default function ActivityChecklist({
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-4">
-      <h3 className="text-sm font-medium text-gray-700 mb-3">Activities</h3>
+    <div className="card p-4">
+      <h3 className="text-sm font-medium text-stone-700 mb-3">Activities</h3>
       <div className="space-y-2">
         {activities.map((activity) => (
           <div key={activity}>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => onToggle(activity)}
-                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                aria-label={`Toggle ${activityLabels[activity] ?? activity}`}
+                aria-pressed={!!completions[activity]}
+                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 ${
                   completions[activity]
-                    ? "bg-gray-900 border-gray-900"
-                    : "border-gray-300"
+                    ? "bg-indigo-600 border-indigo-600"
+                    : "border-stone-300"
                 }`}
               >
                 {completions[activity] && (
@@ -65,15 +67,15 @@ export default function ActivityChecklist({
               <span
                 className={`text-sm flex-1 ${
                   completions[activity]
-                    ? "text-gray-400 line-through"
-                    : "text-gray-700"
+                    ? "text-stone-400 line-through"
+                    : "text-stone-700"
                 }`}
               >
                 {activityLabels[activity] ?? activity}
               </span>
               <button
                 onClick={() => toggleExpand(activity)}
-                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                className="btn btn-ghost text-xs px-2 py-1"
               >
                 notes
               </button>
@@ -85,7 +87,7 @@ export default function ActivityChecklist({
                   value={activityNotes[activity] || ""}
                   onChange={(e) => onSetNote(activity, e.target.value)}
                   placeholder="Add a note (autosaves)..."
-                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  className="input py-1.5 text-sm"
                 />
               </div>
             )}

@@ -84,18 +84,18 @@ export default function PlanManager({
               onCancel={() => setEditing(null)}
             />
           ) : (
-            <div className="bg-white rounded-2xl shadow-sm p-4">
+            <div className="card p-4">
               <div className="flex items-start justify-between mb-2">
                 <div>
-                  <h3 className="font-medium text-gray-900">{plan.name}</h3>
-                  <p className="text-xs text-gray-500">
+                  <h3 className="font-medium text-stone-900">{plan.name}</h3>
+                  <p className="text-xs text-stone-500">
                     {plan.start_date} to {plan.end_date}
                   </p>
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setEditing(plan.id)}
-                    className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                    className="btn btn-ghost text-xs px-2 py-1"
                   >
                     Edit
                   </button>
@@ -106,13 +106,13 @@ export default function PlanManager({
                           await onDelete(plan.id);
                           setDeleteConfirm(null);
                         }}
-                        className="text-xs text-red-600 font-medium"
+                        className="text-xs text-rose-600 font-medium"
                       >
                         Confirm
                       </button>
                       <button
                         onClick={() => setDeleteConfirm(null)}
-                        className="text-xs text-gray-500"
+                        className="text-xs text-stone-500"
                       >
                         Cancel
                       </button>
@@ -120,7 +120,7 @@ export default function PlanManager({
                   ) : (
                     <button
                       onClick={() => setDeleteConfirm(plan.id)}
-                      className="text-xs text-red-500 hover:text-red-700 transition-colors"
+                      className="btn btn-danger-ghost text-xs px-2 py-1"
                     >
                       Delete
                     </button>
@@ -134,14 +134,14 @@ export default function PlanManager({
                   const prep = plan.prep_schedule[String(i)] ?? [];
                   return (
                     <div key={i} className="text-center">
-                      <p className="text-[10px] font-medium text-gray-400 mb-0.5">
+                      <p className="text-[10px] font-medium text-stone-400 mb-0.5">
                         {day}
                       </p>
-                      <p className="text-[10px] text-gray-700">
+                      <p className="text-[10px] text-stone-700">
                         {activityLabels[gym] ?? gym}
                       </p>
                       {prep.map((a: string) => (
-                        <p key={a} className="text-[10px] text-gray-400">
+                        <p key={a} className="text-[10px] text-stone-400">
                           {activityLabels[a] ?? a}
                         </p>
                       ))}
@@ -171,7 +171,7 @@ export default function PlanManager({
       ) : (
         <button
           onClick={() => setEditing("new")}
-          className="w-full py-3 border-2 border-dashed border-gray-300 text-gray-500 rounded-2xl text-sm font-medium hover:border-gray-400 hover:text-gray-700 transition-colors"
+          className="w-full py-3 border-2 border-dashed border-stone-300 text-stone-500 rounded-2xl text-sm font-medium hover:border-stone-400 hover:text-stone-700 transition-colors"
         >
           + Create new plan
         </button>
@@ -182,27 +182,27 @@ export default function PlanManager({
         <div>
           <button
             onClick={() => setShowManage(!showManage)}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-xs text-stone-400 hover:text-stone-600 transition-colors"
           >
             {showManage ? "Hide" : "Manage"} custom topics (
             {customTopics.length})
           </button>
           {showManage && (
-            <div className="mt-2 bg-white rounded-2xl shadow-sm p-4 space-y-2">
+            <div className="mt-2 card p-4 space-y-2">
               {customTopics.map((t) => (
                 <div
                   key={t.id}
                   className="flex items-center justify-between"
                 >
                   <div>
-                    <span className="text-sm text-gray-700">{t.label}</span>
-                    <span className="text-xs text-gray-400 ml-2">
+                    <span className="text-sm text-stone-700">{t.label}</span>
+                    <span className="text-xs text-stone-400 ml-2">
                       {t.category === "gym_type" ? "workout" : t.category}
                     </span>
                   </div>
                   <button
                     onClick={() => onRemoveTopic(t.id)}
-                    className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                    className="btn btn-danger-ghost text-xs px-2 py-1"
                   >
                     Remove
                   </button>
@@ -353,7 +353,7 @@ function PlanForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white rounded-2xl shadow-sm p-4 space-y-4"
+      className="card p-4 space-y-4"
     >
       <input
         type="text"
@@ -361,12 +361,12 @@ function PlanForm({
         onChange={(e) => setName(e.target.value)}
         placeholder="Plan name"
         required
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+        className="input"
       />
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="block text-xs text-gray-500 mb-1">
+          <label className="label">
             Start date
           </label>
           <input
@@ -374,24 +374,24 @@ function PlanForm({
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+            className="input"
           />
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">End date</label>
+          <label className="label">End date</label>
           <input
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+            className="input"
           />
         </div>
       </div>
 
       {/* Schedule builder */}
       <div>
-        <h4 className="text-sm font-medium text-gray-700 mb-2">
+        <h4 className="text-sm font-medium text-stone-700 mb-2">
           Weekly Schedule
         </h4>
         <div className="space-y-3">
@@ -400,10 +400,10 @@ function PlanForm({
             return (
               <div
                 key={i}
-                className="border border-gray-100 rounded-lg p-3"
+                className="border border-stone-200/70 rounded-lg p-3"
               >
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="text-sm font-medium text-gray-700 w-10">
+                  <span className="text-sm font-medium text-stone-700 w-10">
                     {dayName}
                   </span>
                   <select
@@ -416,7 +416,7 @@ function PlanForm({
                         setGym(day, e.target.value);
                       }
                     }}
-                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    className="input flex-1 text-sm py-1.5"
                   >
                     {gymOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -438,8 +438,8 @@ function PlanForm({
                         onClick={() => togglePrep(day, opt.value)}
                         className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
                           active
-                            ? "bg-gray-900 text-white"
-                            : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                            ? "bg-indigo-600 text-white"
+                            : "bg-stone-100 text-stone-500 hover:bg-stone-200"
                         }`}
                       >
                         {opt.label}
@@ -452,7 +452,8 @@ function PlanForm({
                       setAdding("activity");
                       setNewLabel("");
                     }}
-                    className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 transition-colors"
+                    aria-label="Add new activity"
+                    className="px-2 py-0.5 text-xs rounded-full bg-stone-100 text-stone-400 hover:bg-stone-200 transition-colors"
                   >
                     +
                   </button>
@@ -464,7 +465,7 @@ function PlanForm({
 
         {/* Inline add topic form */}
         {adding && (
-          <div className="flex items-center gap-2 mt-3 p-3 border border-dashed border-gray-300 rounded-lg">
+          <div className="flex items-center gap-2 mt-3 p-3 border border-dashed border-stone-300 rounded-lg">
             <input
               type="text"
               value={newLabel}
@@ -480,20 +481,20 @@ function PlanForm({
                   handleAddTopic();
                 }
               }}
-              className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+              className="input flex-1 text-sm py-1.5"
               autoFocus
             />
             <button
               type="button"
               onClick={handleAddTopic}
-              className="px-3 py-1 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-800 transition-colors"
+              className="btn btn-primary text-xs px-3 py-1"
             >
               Add
             </button>
             <button
               type="button"
               onClick={() => setAdding(null)}
-              className="px-3 py-1 text-gray-500 text-xs"
+              className="btn btn-ghost text-xs px-3 py-1"
             >
               Cancel
             </button>
@@ -504,7 +505,7 @@ function PlanForm({
       {/* Workout templates: which exercises make up each workout type */}
       {trainedGymTypes.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium text-gray-700 mb-2">
+          <h4 className="text-sm font-medium text-stone-700 mb-2">
             Workout templates
           </h4>
           <div className="space-y-3">
@@ -519,8 +520,8 @@ function PlanForm({
                   [gymType]: { ...prev[gymType] ?? { warmup: [], cardio: [] }, [field]: list },
                 }));
               return (
-                <div key={gymType} className="border border-gray-100 rounded-lg p-3 space-y-3">
-                  <p className="text-xs font-semibold text-gray-700">{label}</p>
+                <div key={gymType} className="border border-stone-200/70 rounded-lg p-3 space-y-3">
+                  <p className="text-xs font-semibold text-stone-700">{label}</p>
                   <WorkoutTemplateEditor
                     label="Warmup"
                     exercises={meta.warmup}
@@ -580,14 +581,14 @@ function PlanForm({
         <button
           type="submit"
           disabled={saving}
-          className="flex-1 py-2.5 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors"
+          className="btn btn-primary flex-1 py-2.5"
         >
           {saving ? "Saving..." : initial ? "Update plan" : "Create plan"}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+          className="btn btn-secondary flex-1 py-2.5"
         >
           Cancel
         </button>
@@ -642,22 +643,22 @@ function WorkoutTemplateEditor({
 
   return (
     <div>
-      <p className="text-xs font-medium text-gray-500 mb-1">{label}</p>
+      <p className="text-xs font-medium text-stone-500 mb-1">{label}</p>
       {exercises.length === 0 ? (
-        <p className="text-xs text-gray-400 mb-2">No exercises yet</p>
+        <p className="text-xs text-stone-400 mb-2">No exercises yet</p>
       ) : (
         <ul className="space-y-1 mb-2">
           {exercises.map((ex, i) => (
             <li
               key={`${ex}-${i}`}
-              className="flex items-center gap-1 text-sm text-gray-700"
+              className="flex items-center gap-1 text-sm text-stone-700"
             >
               <span className="flex-1 truncate">{ex}</span>
               <button
                 type="button"
                 onClick={() => onMove(i, -1)}
                 disabled={i === 0}
-                className="px-1.5 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                className="px-1.5 text-stone-400 hover:text-stone-700 disabled:opacity-30"
                 aria-label="Move up"
               >
                 ↑
@@ -666,7 +667,7 @@ function WorkoutTemplateEditor({
                 type="button"
                 onClick={() => onMove(i, 1)}
                 disabled={i === exercises.length - 1}
-                className="px-1.5 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                className="px-1.5 text-stone-400 hover:text-stone-700 disabled:opacity-30"
                 aria-label="Move down"
               >
                 ↓
@@ -674,7 +675,7 @@ function WorkoutTemplateEditor({
               <button
                 type="button"
                 onClick={() => onRemove(i)}
-                className="px-1.5 text-gray-400 hover:text-red-500"
+                className="px-1.5 text-stone-400 hover:text-rose-500"
                 aria-label="Remove"
               >
                 ×
@@ -697,13 +698,13 @@ function WorkoutTemplateEditor({
                 handleCreate();
               }
             }}
-            className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+            className="input flex-1 text-sm py-1.5"
             autoFocus
           />
           <button
             type="button"
             onClick={handleCreate}
-            className="px-3 py-1 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-800 transition-colors"
+            className="btn btn-primary text-xs px-3 py-1"
           >
             Add
           </button>
@@ -713,7 +714,7 @@ function WorkoutTemplateEditor({
               setCreating(false);
               setNewName("");
             }}
-            className="px-3 py-1 text-gray-500 text-xs"
+            className="btn btn-ghost text-xs px-3 py-1"
           >
             Cancel
           </button>
@@ -722,7 +723,7 @@ function WorkoutTemplateEditor({
         <select
           value={selected}
           onChange={handleSelect}
-          className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
+          className="input text-sm py-1.5"
         >
           <option value="">+ Add exercise...</option>
           {available.map((ex) => (
