@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { toDateString, addDays, isSameDay } from "@/lib/dates";
 import { getActivitiesForDate, isWorkoutDay, getGymType } from "@/config/schedule";
@@ -15,6 +15,7 @@ import PainSlider from "./PainSlider";
 import ActivityChecklist from "./ActivityChecklist";
 import WorkoutLogger from "./WorkoutLogger";
 import DailyNotes from "./DailyNotes";
+import DayEventsPanel from "./DayEventsPanel";
 import Calendar from "./Calendar";
 import PlanManager from "./PlanManager";
 import WidgetConfigurator from "./WidgetConfigurator";
@@ -46,6 +47,19 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
       window.history.replaceState({}, "", "/");
     }
   }, [searchParams]);
+
+  // Pull the latest Google Calendar events once per session so the day view
+  // stays fresh between daily cron runs. Fire-and-forget; bumps calRefresh so
+  // the events panel reloads when the import lands.
+  const [calRefresh, setCalRefresh] = useState(0);
+  const pulledRef = useRef(false);
+  useEffect(() => {
+    if (pulledRef.current) return;
+    pulledRef.current = true;
+    fetch("/api/google/pull", { method: "POST" })
+      .then(() => setCalRefresh((k) => k + 1))
+      .catch(() => {});
+  }, []);
 
   const dateStr = toDateString(selectedDate);
   const isToday = isSameDay(selectedDate, today);
@@ -337,6 +351,12 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
             <DailyNotes
               value={dailyLog.notes}
               onChange={dailyLog.setNotes}
+            />
+
+            <DayEventsPanel
+              userId={userId}
+              dateStr={dateStr}
+              refreshKey={calRefresh}
             />
 
             {/* Delete day */}

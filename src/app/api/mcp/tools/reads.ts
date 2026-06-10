@@ -37,6 +37,7 @@ export function registerReadTools(
         overrideRes,
         eventsRes,
         widgetRes,
+        calendarRes,
       ] = await Promise.all([
         client
           .from("daily_logs")
@@ -80,6 +81,13 @@ export function registerReadTools(
           .select("widget_id, value, activity_type, widget_definitions(name, type)")
           .eq("user_id", userId)
           .eq("date", date),
+        client
+          .from("google_events")
+          .select("id, title, all_day, start_time, end_time, html_link")
+          .eq("user_id", userId)
+          .eq("date", date)
+          .order("all_day", { ascending: false })
+          .order("start_time"),
       ]);
 
       const dailyLog = dailyLogRes.data as DailyLog | null;
@@ -148,6 +156,24 @@ export function registerReadTools(
         }),
       );
 
+      const calendarEvents = (calendarRes.data ?? []).map(
+        (e: {
+          id: string;
+          title: string;
+          all_day: boolean;
+          start_time: string | null;
+          end_time: string | null;
+          html_link: string | null;
+        }) => ({
+          id: e.id,
+          title: e.title,
+          all_day: e.all_day,
+          start_time: e.start_time,
+          end_time: e.end_time,
+          html_link: e.html_link,
+        }),
+      );
+
       const widgetValues = (widgetRes.data ?? []).map(
         (v: Record<string, unknown>) => {
           const def = v.widget_definitions as Record<string, unknown> | null;
@@ -200,6 +226,7 @@ export function registerReadTools(
         workout_sets_by_exercise: grouped,
         widget_values: widgetValues,
         events: lifeEvents,
+        calendar_events: calendarEvents,
       };
       return {
         content: [

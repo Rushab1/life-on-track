@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { pushToCalendar } from "@/lib/google/calendar";
 import { dateSchema, uuidSchema, safeErrorMessage } from "../validation";
 
 /**
@@ -122,6 +123,7 @@ export function registerLifeEventTool(
             content: [{ type: "text" as const, text: safeErrorMessage(error) }],
           };
         }
+        await pushToCalendar(client, userId, date, date);
         return {
           content: [
             {
@@ -140,6 +142,12 @@ export function registerLifeEventTool(
             ],
           };
         }
+        const { data: row } = await client
+          .from("life_events")
+          .select("date")
+          .eq("user_id", userId)
+          .eq("id", id)
+          .maybeSingle();
         const { error } = await client
           .from("life_events")
           .delete()
@@ -149,6 +157,9 @@ export function registerLifeEventTool(
           return {
             content: [{ type: "text" as const, text: safeErrorMessage(error) }],
           };
+        }
+        if (row?.date) {
+          await pushToCalendar(client, userId, row.date as string, row.date as string);
         }
         return {
           content: [

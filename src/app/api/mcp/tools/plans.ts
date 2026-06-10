@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Plan } from "@/lib/types";
+import { maybePushAfterMutation } from "@/lib/google/calendar";
 import { dateSchema, uuidSchema, safeErrorMessage } from "../validation";
 
 const gymScheduleSchema = z
@@ -203,6 +204,7 @@ export function registerPlanTool(
             ],
           };
         }
+        void maybePushAfterMutation(client, userId);
         return {
           content: [
             {
@@ -249,6 +251,7 @@ export function registerPlanTool(
             ],
           };
         }
+        void maybePushAfterMutation(client, userId);
         return {
           content: [
             { type: "text" as const, text: `Plan ${id} updated.` },
@@ -279,6 +282,7 @@ export function registerPlanTool(
             ],
           };
         }
+        void maybePushAfterMutation(client, userId);
         return {
           content: [
             { type: "text" as const, text: `Plan ${id} deleted.` },

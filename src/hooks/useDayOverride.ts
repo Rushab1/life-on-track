@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { triggerCalendarSync } from "@/lib/google/triggerSync";
 
 /** Fetch (and mutate) the day_overrides row for (user, date). */
 export function useDayOverride(userId: string, dateStr: string) {
@@ -41,6 +42,7 @@ export function useDayOverride(userId: string, dateStr: string) {
           );
       }
       await load();
+      triggerCalendarSync();
     },
     [userId, dateStr, load],
   );

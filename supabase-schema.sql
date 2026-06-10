@@ -104,6 +104,7 @@ create table life_events (
   date date not null,
   title text not null,
   notes text,
+  google_event_id text,
   created_at timestamptz default now()
 );
 
@@ -111,6 +112,26 @@ create index idx_life_events_user_date on life_events(user_id, date);
 
 alter table life_events enable row level security;
 create policy "own events" on life_events for all using (auth.uid() = user_id);
+
+-- Events imported (read-only) from the user's Google Calendar (inbound sync)
+create table google_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  google_event_id text not null,
+  date date not null,
+  title text not null,
+  start_time timestamptz,
+  end_time timestamptz,
+  all_day boolean not null default false,
+  html_link text,
+  last_synced_at timestamptz not null default now(),
+  unique (user_id, google_event_id)
+);
+
+create index idx_google_events_user_date on google_events(user_id, date);
+
+alter table google_events enable row level security;
+create policy "own google events" on google_events for all using (auth.uid() = user_id);
 
 -- Configurable widget system
 create table widget_definitions (

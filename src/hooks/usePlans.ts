@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { triggerCalendarSync } from "@/lib/google/triggerSync";
 import type { Plan, WorkoutMeta } from "@/lib/types";
 
 export function usePlans(userId: string) {
@@ -39,6 +40,7 @@ export function usePlans(userId: string) {
       workout_meta: plan.workout_meta ?? {},
     });
     await load();
+    triggerCalendarSync();
   }
 
   async function update(
@@ -58,11 +60,13 @@ export function usePlans(userId: string) {
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq("id", id);
     await load();
+    triggerCalendarSync();
   }
 
   async function remove(id: string) {
     await supabase.from("plans").delete().eq("id", id);
     await load();
+    triggerCalendarSync();
   }
 
   return { plans, loading, create, update, remove, reload: load };

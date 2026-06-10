@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { pushToCalendar } from "@/lib/google/calendar";
 import { dateSchema, safeErrorMessage } from "../validation";
 
 /**
@@ -199,6 +200,7 @@ export function registerCatalogTools(
             ],
           };
         }
+        await pushToCalendar(client, userId, date, date);
         return {
           content: [
             { type: "text" as const, text: `Cleared gym override for ${date}.` },
@@ -221,6 +223,7 @@ export function registerCatalogTools(
           ],
         };
       }
+      await pushToCalendar(client, userId, date, date);
       return {
         content: [
           {

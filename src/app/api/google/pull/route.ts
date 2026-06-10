@@ -3,10 +3,13 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { toDateString, addDays } from "@/lib/dates";
-import { pushToCalendar } from "@/lib/google/calendar";
+import { pullFromCalendar } from "@/lib/google/calendar";
 
+/**
+ * Inbound pull for the logged-in user (today..+14). Called fire-and-forget by
+ * the day view on open so Google → app stays fresh between daily cron runs.
+ */
 export async function POST(): Promise<Response> {
-  // Authenticate user
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,29 +21,18 @@ export async function POST(): Promise<Response> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Service role for token + cross-table access
   const admin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
 
-  const { data: tokenRow } = await admin
-    .from("google_tokens")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (!tokenRow) {
-    return NextResponse.json(
-      { error: "Google Calendar not connected" },
-      { status: 400 },
-    );
-  }
-
   const today = new Date();
-  const startDate = toDateString(today);
-  const endDate = toDateString(addDays(today, 14));
-
-  const result = await pushToCalendar(admin, user.id, startDate, endDate);
-  return NextResponse.json({ ...result, startDate, endDate });
+  const result = await pullFromCalendar(
+    admin,
+    user.id,
+    toDateString(today),
+    toDateString(addDays(today, 14)),
+  );
+  return NextResponse.json(result);
 }
