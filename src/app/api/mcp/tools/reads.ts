@@ -39,6 +39,7 @@ export function registerReadTools(
         widgetRes,
         calendarRes,
         ouraRes,
+        ouraWorkoutsRes,
       ] = await Promise.all([
         client
           .from("daily_logs")
@@ -92,11 +93,19 @@ export function registerReadTools(
         client
           .from("oura_daily")
           .select(
-            "sleep_score, readiness_score, activity_score, total_sleep_minutes, sleep_efficiency, avg_hrv, resting_hr, temperature_deviation, steps, active_calories, total_calories",
+            "sleep_score, readiness_score, activity_score, total_sleep_minutes, sleep_efficiency, avg_hrv, resting_hr, temperature_deviation, steps, active_calories, total_calories, high_activity_minutes, medium_activity_minutes, low_activity_minutes",
           )
           .eq("user_id", userId)
           .eq("date", date)
           .maybeSingle(),
+        client
+          .from("oura_workouts")
+          .select(
+            "activity, intensity, calories, distance, start_time, end_time, source, label",
+          )
+          .eq("user_id", userId)
+          .eq("date", date)
+          .order("start_time"),
       ]);
 
       const dailyLog = dailyLogRes.data as DailyLog | null;
@@ -237,6 +246,7 @@ export function registerReadTools(
         events: lifeEvents,
         calendar_events: calendarEvents,
         oura: ouraRes.data ?? null,
+        oura_workouts: ouraWorkoutsRes.data ?? [],
       };
       return {
         content: [

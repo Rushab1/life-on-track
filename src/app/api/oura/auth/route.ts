@@ -4,7 +4,9 @@ import { NextResponse } from "next/server";
 import { signState } from "@/lib/oauthState";
 
 const OURA_CLIENT_ID = process.env.OURA_CLIENT_ID;
-const SCOPES = "daily heartrate personal";
+// Everything Oura offers: daily summaries, heart rate, workouts, sessions,
+// tags, SpO2, and basic profile info.
+const SCOPES = "email personal daily heartrate workout tag session spo2";
 
 function getRedirectUri(req: Request): string {
   const url = new URL(req.url);

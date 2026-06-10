@@ -21,6 +21,22 @@ interface DailyActivity extends DailyScore {
   steps?: number | null;
   active_calories?: number | null;
   total_calories?: number | null;
+  high_activity_time?: number | null; // seconds
+  medium_activity_time?: number | null;
+  low_activity_time?: number | null;
+}
+
+interface OuraWorkout {
+  id: string;
+  day: string;
+  activity?: string | null;
+  intensity?: string | null;
+  calories?: number | null;
+  distance?: number | null;
+  start_datetime?: string | null;
+  end_datetime?: string | null;
+  source?: string | null;
+  label?: string | null;
 }
 
 interface SleepPeriod {
@@ -76,12 +92,16 @@ export async function syncOuraDaily(
   const accessToken = await getValidOuraToken(client, userId);
   if (!accessToken) return { synced: 0 };
 
-  const [sleepScores, readiness, activity, sleepPeriods] = await Promise.all([
-    fetchAll<DailyScore>(accessToken, "daily_sleep", startDate, endDate),
-    fetchAll<DailyReadiness>(accessToken, "daily_readiness", startDate, endDate),
-    fetchAll<DailyActivity>(accessToken, "daily_activity", startDate, endDate),
-    fetchAll<SleepPeriod>(accessToken, "sleep", startDate, endDate),
-  ]);
+  const [sleepScores, readiness, activity, sleepPeriods, workouts] =
+    await Promise.all([
+      fetchAll<DailyScore>(accessToken, "daily_sleep", startDate, endDate),
+      fetchAll<DailyReadiness>(accessToken, "daily_readiness", startDate, endDate),
+      fetchAll<DailyActivity>(accessToken, "daily_activity", startDate, endDate),
+      fetchAll<SleepPeriod>(accessToken, "sleep", startDate, endDate),
+      // Needs the `workout` scope; users connected before the scope was added
+      // get an empty list here until they reconnect.
+      fetchAll<OuraWorkout>(accessToken, "workout", startDate, endDate),
+    ]);
 
   const byDay = new Map<string, Record<string, unknown>>();
   const row = (day: string) => {
@@ -102,12 +122,17 @@ export async function syncOuraDaily(
       temperature_deviation: r.temperature_deviation ?? null,
     });
   }
+  const secToMin = (s: number | null | undefined) =>
+    s != null ? Math.round(s / 60) : null;
   for (const a of activity) {
     Object.assign(row(a.day), {
       activity_score: a.score ?? null,
       steps: a.steps ?? null,
       active_calories: a.active_calories ?? null,
       total_calories: a.total_calories ?? null,
+      high_activity_minutes: secToMin(a.high_activity_time),
+      medium_activity_minutes: secToMin(a.medium_activity_time),
+      low_activity_minutes: secToMin(a.low_activity_time),
     });
   }
 
@@ -145,5 +170,29 @@ export async function syncOuraDaily(
       return { synced: 0 };
     }
   }
+
+  const workoutRows = workouts
+    .filter((w) => w.id && w.day)
+    .map((w) => ({
+      user_id: userId,
+      oura_workout_id: w.id,
+      date: w.day,
+      activity: w.activity ?? null,
+      intensity: w.intensity ?? null,
+      calories: w.calories ?? null,
+      distance: w.distance ?? null,
+      start_time: w.start_datetime ?? null,
+      end_time: w.end_datetime ?? null,
+      source: w.source ?? null,
+      label: w.label ?? null,
+      last_synced_at: new Date().toISOString(),
+    }));
+  if (workoutRows.length > 0) {
+    const { error } = await client
+      .from("oura_workouts")
+      .upsert(workoutRows, { onConflict: "user_id,oura_workout_id" });
+    if (error) console.error("syncOuraDaily: workout upsert failed", error);
+  }
+
   return { synced: rows.length };
 }

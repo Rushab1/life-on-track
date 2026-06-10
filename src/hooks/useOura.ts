@@ -16,6 +16,21 @@ export interface OuraDaily {
   steps: number | null;
   active_calories: number | null;
   total_calories: number | null;
+  high_activity_minutes: number | null;
+  medium_activity_minutes: number | null;
+  low_activity_minutes: number | null;
+}
+
+export interface OuraWorkout {
+  id: string;
+  activity: string | null;
+  intensity: string | null;
+  calories: number | null;
+  distance: number | null;
+  start_time: string | null;
+  end_time: string | null;
+  source: string | null;
+  label: string | null;
 }
 
 export function useOuraConnection(userId: string) {
@@ -49,29 +64,38 @@ export function useOuraConnection(userId: string) {
   return { connected, loading, disconnect, reload: load };
 }
 
-/** Oura metrics for one date (null when not synced / not connected). */
+/** Oura metrics + workout sessions for one date (null/empty when not synced). */
 export function useOuraDaily(userId: string, dateStr: string, refresh = 0) {
   const [daily, setDaily] = useState<OuraDaily | null>(null);
+  const [workouts, setWorkouts] = useState<OuraWorkout[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    supabase
-      .from("oura_daily")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("date", dateStr)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (cancelled) return;
-        setDaily((data as OuraDaily | null) ?? null);
-        setLoading(false);
-      });
+    Promise.all([
+      supabase
+        .from("oura_daily")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("date", dateStr)
+        .maybeSingle(),
+      supabase
+        .from("oura_workouts")
+        .select("id, activity, intensity, calories, distance, start_time, end_time, source, label")
+        .eq("user_id", userId)
+        .eq("date", dateStr)
+        .order("start_time"),
+    ]).then(([dailyRes, workoutsRes]) => {
+      if (cancelled) return;
+      setDaily((dailyRes.data as OuraDaily | null) ?? null);
+      setWorkouts((workoutsRes.data as OuraWorkout[] | null) ?? []);
+      setLoading(false);
+    });
     return () => {
       cancelled = true;
     };
   }, [userId, dateStr, refresh]);
 
-  return { daily, loading };
+  return { daily, workouts, loading };
 }
