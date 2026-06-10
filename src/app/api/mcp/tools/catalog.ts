@@ -17,7 +17,7 @@ export function registerCatalogTools(
 ) {
   server.tool(
     "manage_exercise",
-    'Exercise catalog admin. action="list" returns all known exercises (presets + user-owned), optionally filtered by category. "add" creates a new exercise (user-owned) — name is required, category optional. "remove" deletes a user-owned exercise by name (presets cannot be removed). Categories: push, pull, legs_heavy, legs_light, shared, warmup, cardio.',
+    'Exercise catalog admin. action="list" returns all known exercises (presets + user-owned), optionally filtered by category. "add" creates a new exercise (user-owned) — name is required, category optional. "remove" deletes a user-owned exercise by name (presets cannot be removed). Categories: push, pull, legs_heavy, legs_light, shared, warmup, cardio. PROTOCOL: before adding a new exercise, ALWAYS action="list" and check for near-matches and synonyms (raise/lift, RDL/Romanian deadlift, BB/DB). Avoid duplicates; prefer logging under the existing canonical name and telling the user which name was used. Follow the workout-logging prompt for the full session protocol.',
     {
       action: z.enum(["list", "add", "remove"]).describe("Catalog action"),
       name: z

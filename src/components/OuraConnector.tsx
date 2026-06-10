@@ -38,21 +38,21 @@ export default function OuraConnector({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="p-3 bg-stone-50 rounded-xl border border-stone-200/60 space-y-3">
+    <div className="p-3 bg-white/[0.04] rounded-xl border border-white/[0.06] space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <svg className="w-5 h-5 text-stone-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg className="w-5 h-5 text-stone-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <circle cx="12" cy="12" r="9" />
             <circle cx="12" cy="12" r="4.5" />
           </svg>
           <div>
-            <p className="text-sm font-medium text-stone-900">Oura Ring</p>
+            <p className="text-sm font-medium text-stone-100">Oura Ring</p>
             {loading ? (
-              <p className="text-xs text-stone-400">Checking...</p>
+              <p className="text-xs text-stone-500">Checking...</p>
             ) : connected ? (
-              <p className="text-xs text-emerald-600">Connected</p>
+              <p className="text-xs text-emerald-400">Connected</p>
             ) : (
-              <p className="text-xs text-stone-400">Not connected</p>
+              <p className="text-xs text-stone-500">Not connected</p>
             )}
           </div>
         </div>
@@ -87,11 +87,11 @@ export default function OuraConnector({ userId }: { userId: string }) {
       </div>
 
       {syncResult && (
-        <p className="text-xs text-emerald-600">
+        <p className="text-xs text-emerald-400">
           Synced {syncResult.synced} day{syncResult.synced === 1 ? "" : "s"} of data
         </p>
       )}
-      {syncError && <p className="text-xs text-rose-600">{syncError}</p>}
+      {syncError && <p className="text-xs text-rose-400">{syncError}</p>}
     </div>
   );
 }

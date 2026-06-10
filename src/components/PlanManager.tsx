@@ -87,7 +87,7 @@ export default function PlanManager({
             <div className="card p-4">
               <div className="flex items-start justify-between mb-2">
                 <div>
-                  <h3 className="font-medium text-stone-900">{plan.name}</h3>
+                  <h3 className="font-medium text-stone-100">{plan.name}</h3>
                   <p className="text-xs text-stone-500">
                     {plan.start_date} to {plan.end_date}
                   </p>
@@ -106,7 +106,7 @@ export default function PlanManager({
                           await onDelete(plan.id);
                           setDeleteConfirm(null);
                         }}
-                        className="text-xs text-rose-600 font-medium"
+                        className="text-xs text-rose-400 font-medium"
                       >
                         Confirm
                       </button>
@@ -134,14 +134,14 @@ export default function PlanManager({
                   const prep = plan.prep_schedule[String(i)] ?? [];
                   return (
                     <div key={i} className="text-center">
-                      <p className="text-[10px] font-medium text-stone-400 mb-0.5">
+                      <p className="text-[10px] font-medium text-stone-500 mb-0.5">
                         {day}
                       </p>
-                      <p className="text-[10px] text-stone-700">
+                      <p className="text-[10px] text-stone-300">
                         {activityLabels[gym] ?? gym}
                       </p>
                       {prep.map((a: string) => (
-                        <p key={a} className="text-[10px] text-stone-400">
+                        <p key={a} className="text-[10px] text-stone-500">
                           {activityLabels[a] ?? a}
                         </p>
                       ))}
@@ -171,7 +171,7 @@ export default function PlanManager({
       ) : (
         <button
           onClick={() => setEditing("new")}
-          className="w-full py-3 border-2 border-dashed border-stone-300 text-stone-500 rounded-2xl text-sm font-medium hover:border-stone-400 hover:text-stone-700 transition-colors"
+          className="w-full py-3 border-2 border-dashed border-white/15 text-stone-500 rounded-2xl text-sm font-medium hover:border-white/25 hover:text-stone-200 transition-colors"
         >
           + Create new plan
         </button>
@@ -182,7 +182,7 @@ export default function PlanManager({
         <div>
           <button
             onClick={() => setShowManage(!showManage)}
-            className="text-xs text-stone-400 hover:text-stone-600 transition-colors"
+            className="text-xs text-stone-500 hover:text-stone-300 transition-colors"
           >
             {showManage ? "Hide" : "Manage"} custom topics (
             {customTopics.length})
@@ -195,8 +195,8 @@ export default function PlanManager({
                   className="flex items-center justify-between"
                 >
                   <div>
-                    <span className="text-sm text-stone-700">{t.label}</span>
-                    <span className="text-xs text-stone-400 ml-2">
+                    <span className="text-sm text-stone-300">{t.label}</span>
+                    <span className="text-xs text-stone-500 ml-2">
                       {t.category === "gym_type" ? "workout" : t.category}
                     </span>
                   </div>
@@ -391,7 +391,7 @@ function PlanForm({
 
       {/* Schedule builder */}
       <div>
-        <h4 className="text-sm font-medium text-stone-700 mb-2">
+        <h4 className="text-sm font-medium text-stone-300 mb-2">
           Weekly Schedule
         </h4>
         <div className="space-y-3">
@@ -400,10 +400,10 @@ function PlanForm({
             return (
               <div
                 key={i}
-                className="border border-stone-200/70 rounded-lg p-3"
+                className="border border-white/[0.08] rounded-lg p-3"
               >
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="text-sm font-medium text-stone-700 w-10">
+                  <span className="text-sm font-medium text-stone-300 w-10">
                     {dayName}
                   </span>
                   <select
@@ -438,8 +438,8 @@ function PlanForm({
                         onClick={() => togglePrep(day, opt.value)}
                         className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
                           active
-                            ? "bg-indigo-600 text-white"
-                            : "bg-stone-100 text-stone-500 hover:bg-stone-200"
+                            ? "bg-indigo-500 text-white"
+                            : "bg-white/[0.06] text-stone-400 hover:bg-white/[0.08]"
                         }`}
                       >
                         {opt.label}
@@ -453,7 +453,7 @@ function PlanForm({
                       setNewLabel("");
                     }}
                     aria-label="Add new activity"
-                    className="px-2 py-0.5 text-xs rounded-full bg-stone-100 text-stone-400 hover:bg-stone-200 transition-colors"
+                    className="px-2 py-0.5 text-xs rounded-full bg-white/[0.06] text-stone-500 hover:bg-white/[0.08] transition-colors"
                   >
                     +
                   </button>
@@ -465,7 +465,7 @@ function PlanForm({
 
         {/* Inline add topic form */}
         {adding && (
-          <div className="flex items-center gap-2 mt-3 p-3 border border-dashed border-stone-300 rounded-lg">
+          <div className="flex items-center gap-2 mt-3 p-3 border border-dashed border-white/15 rounded-lg">
             <input
               type="text"
               value={newLabel}
@@ -505,7 +505,7 @@ function PlanForm({
       {/* Workout templates: which exercises make up each workout type */}
       {trainedGymTypes.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium text-stone-700 mb-2">
+          <h4 className="text-sm font-medium text-stone-300 mb-2">
             Workout templates
           </h4>
           <div className="space-y-3">
@@ -520,8 +520,8 @@ function PlanForm({
                   [gymType]: { ...prev[gymType] ?? { warmup: [], cardio: [] }, [field]: list },
                 }));
               return (
-                <div key={gymType} className="border border-stone-200/70 rounded-lg p-3 space-y-3">
-                  <p className="text-xs font-semibold text-stone-700">{label}</p>
+                <div key={gymType} className="border border-white/[0.08] rounded-lg p-3 space-y-3">
+                  <p className="text-xs font-semibold text-stone-300">{label}</p>
                   <WorkoutTemplateEditor
                     label="Warmup"
                     exercises={meta.warmup}
@@ -645,20 +645,20 @@ function WorkoutTemplateEditor({
     <div>
       <p className="text-xs font-medium text-stone-500 mb-1">{label}</p>
       {exercises.length === 0 ? (
-        <p className="text-xs text-stone-400 mb-2">No exercises yet</p>
+        <p className="text-xs text-stone-500 mb-2">No exercises yet</p>
       ) : (
         <ul className="space-y-1 mb-2">
           {exercises.map((ex, i) => (
             <li
               key={`${ex}-${i}`}
-              className="flex items-center gap-1 text-sm text-stone-700"
+              className="flex items-center gap-1 text-sm text-stone-300"
             >
               <span className="flex-1 truncate">{ex}</span>
               <button
                 type="button"
                 onClick={() => onMove(i, -1)}
                 disabled={i === 0}
-                className="px-1.5 text-stone-400 hover:text-stone-700 disabled:opacity-30"
+                className="px-1.5 text-stone-500 hover:text-stone-200 disabled:opacity-30"
                 aria-label="Move up"
               >
                 ↑
@@ -667,7 +667,7 @@ function WorkoutTemplateEditor({
                 type="button"
                 onClick={() => onMove(i, 1)}
                 disabled={i === exercises.length - 1}
-                className="px-1.5 text-stone-400 hover:text-stone-700 disabled:opacity-30"
+                className="px-1.5 text-stone-500 hover:text-stone-200 disabled:opacity-30"
                 aria-label="Move down"
               >
                 ↓
@@ -675,7 +675,7 @@ function WorkoutTemplateEditor({
               <button
                 type="button"
                 onClick={() => onRemove(i)}
-                className="px-1.5 text-stone-400 hover:text-rose-500"
+                className="px-1.5 text-stone-500 hover:text-rose-400"
                 aria-label="Remove"
               >
                 ×

@@ -8,7 +8,7 @@ interface DailyNotesProps {
 export default function DailyNotes({ value, onChange }: DailyNotesProps) {
   return (
     <div className="card p-4">
-      <h3 className="text-sm font-medium text-stone-700 mb-3">Daily Notes</h3>
+      <h3 className="text-sm font-medium text-stone-300 mb-3">Daily Notes</h3>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}

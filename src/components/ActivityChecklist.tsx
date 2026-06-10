@@ -33,7 +33,7 @@ export default function ActivityChecklist({
 
   return (
     <div className="card p-4">
-      <h3 className="text-sm font-medium text-stone-700 mb-3">Activities</h3>
+      <h3 className="text-sm font-medium text-stone-300 mb-3">Activities</h3>
       <div className="space-y-2">
         {activities.map((activity) => (
           <div key={activity}>
@@ -44,8 +44,8 @@ export default function ActivityChecklist({
                 aria-pressed={!!completions[activity]}
                 className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 ${
                   completions[activity]
-                    ? "bg-indigo-600 border-indigo-600"
-                    : "border-stone-300"
+                    ? "bg-indigo-500 border-indigo-400"
+                    : "border-white/15"
                 }`}
               >
                 {completions[activity] && (
@@ -67,8 +67,8 @@ export default function ActivityChecklist({
               <span
                 className={`text-sm flex-1 ${
                   completions[activity]
-                    ? "text-stone-400 line-through"
-                    : "text-stone-700"
+                    ? "text-stone-500 line-through"
+                    : "text-stone-300"
                 }`}
               >
                 {activityLabels[activity] ?? activity}

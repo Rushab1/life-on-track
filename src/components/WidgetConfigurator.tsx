@@ -20,13 +20,13 @@ const SCOPE_OPTIONS: { value: WidgetDefinition["scope"]; label: string }[] = [
 
 function typeBadge(type: string) {
   const colors: Record<string, string> = {
-    slider: "bg-blue-100 text-blue-700",
-    counter: "bg-purple-100 text-purple-700",
-    boolean: "bg-green-100 text-green-700",
-    text: "bg-amber-100 text-amber-700",
-    select: "bg-orange-100 text-orange-700",
+    slider: "bg-blue-500/15 text-blue-300",
+    counter: "bg-purple-500/15 text-purple-300",
+    boolean: "bg-emerald-500/15 text-emerald-300",
+    text: "bg-amber-500/15 text-amber-300",
+    select: "bg-orange-500/15 text-orange-300",
   };
-  return colors[type] ?? "bg-stone-100 text-stone-700";
+  return colors[type] ?? "bg-white/[0.06] text-stone-300";
 }
 
 export default function WidgetConfigurator({ userId }: { userId: string }) {
@@ -36,34 +36,34 @@ export default function WidgetConfigurator({ userId }: { userId: string }) {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-semibold text-stone-900 mb-1">Widgets</h3>
+        <h3 className="text-lg font-semibold text-stone-100 mb-1">Widgets</h3>
         <p className="text-sm text-stone-500">
           Custom trackers that appear on your daily log.
         </p>
       </div>
 
       {loading ? (
-        <p className="text-sm text-stone-400">Loading widgets...</p>
+        <p className="text-sm text-stone-500">Loading widgets...</p>
       ) : widgets.length === 0 ? (
-        <p className="text-sm text-stone-400">No widgets configured.</p>
+        <p className="text-sm text-stone-500">No widgets configured.</p>
       ) : (
         <div className="space-y-2">
           {widgets.map((w) => (
             <div
               key={w.id}
-              className="flex items-center justify-between p-3 bg-stone-50 rounded-lg"
+              className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg"
             >
               <div className="flex items-center gap-2">
-                <p className="text-sm font-medium text-stone-900">{w.name}</p>
+                <p className="text-sm font-medium text-stone-100">{w.name}</p>
                 <span className={`badge ${typeBadge(w.type)}`}>
                   {w.type}
                 </span>
                 {w.scope !== "daily" && (
-                  <span className="text-[10px] text-stone-400">{w.scope}</span>
+                  <span className="text-[10px] text-stone-500">{w.scope}</span>
                 )}
               </div>
               {w.preset ? (
-                <span className="text-xs text-stone-400">Preset</span>
+                <span className="text-xs text-stone-500">Preset</span>
               ) : (
                 <button
                   onClick={() => remove(w.id)}
@@ -88,8 +88,8 @@ export default function WidgetConfigurator({ userId }: { userId: string }) {
       ) : (
         <button
           onClick={() => setCreating(true)}
-          className="w-full py-3 border-2 border-dashed border-stone-300 text-stone-500
-                     rounded-2xl text-sm font-medium hover:border-stone-400 hover:text-stone-700
+          className="w-full py-3 border-2 border-dashed border-white/15 text-stone-500
+                     rounded-2xl text-sm font-medium hover:border-white/25 hover:text-stone-200
                      transition-colors"
         >
           + Create widget
@@ -175,8 +175,8 @@ function CreateWidgetForm({
               onClick={() => setType(t.value)}
               className={`px-3 py-1 text-xs rounded-full transition-colors ${
                 type === t.value
-                  ? "bg-indigo-600 text-white"
-                  : "bg-stone-100 text-stone-500 hover:bg-stone-200"
+                  ? "bg-indigo-500 text-white"
+                  : "bg-white/[0.06] text-stone-400 hover:bg-white/[0.08]"
               }`}
             >
               {t.label}
@@ -225,7 +225,7 @@ function CreateWidgetForm({
           <label className="label mb-0">Options</label>
           {options.map((opt, i) => (
             <div key={i} className="flex items-center gap-2">
-              <span className="text-sm text-stone-700 flex-1">{opt}</span>
+              <span className="text-sm text-stone-300 flex-1">{opt}</span>
               <button type="button" onClick={() => setOptions(options.filter((_, j) => j !== i))}
                 className="btn btn-danger-ghost text-xs px-2 py-1">
                 Remove
@@ -263,8 +263,8 @@ function CreateWidgetForm({
               onClick={() => setScope(s.value)}
               className={`px-3 py-1 text-xs rounded-full transition-colors ${
                 scope === s.value
-                  ? "bg-indigo-600 text-white"
-                  : "bg-stone-100 text-stone-500 hover:bg-stone-200"
+                  ? "bg-indigo-500 text-white"
+                  : "bg-white/[0.06] text-stone-400 hover:bg-white/[0.08]"
               }`}
             >
               {s.label}

@@ -112,7 +112,7 @@ export default function McpTokenManager({ userId }: { userId: string }) {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-stone-900 mb-1">MCP Tokens</h3>
+        <h3 className="text-lg font-semibold text-stone-100 mb-1">MCP Tokens</h3>
         <p className="text-sm text-stone-500">
           Connect Life on Track to Claude Desktop or Claude Code.
         </p>
@@ -139,11 +139,11 @@ export default function McpTokenManager({ userId }: { userId: string }) {
 
       {/* Show newly generated token */}
       {generatedToken && (
-        <div className="p-4 bg-amber-50 border border-amber-200/70 rounded-xl space-y-3">
-          <p className="text-sm font-medium text-amber-800">
+        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-3">
+          <p className="text-sm font-medium text-amber-300">
             Save this token now — it won&apos;t be shown again!
           </p>
-          <code className="block p-2 bg-white border border-amber-300 rounded text-xs break-all font-mono">
+          <code className="block p-2 bg-[#14151c] border border-amber-500/20 rounded text-xs break-all font-mono">
             {generatedToken}
           </code>
           <div className="flex gap-2">
@@ -153,13 +153,13 @@ export default function McpTokenManager({ userId }: { userId: string }) {
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
               }}
-              className="btn px-3 py-1.5 bg-amber-100 text-amber-800 hover:bg-amber-200"
+              className="btn px-3 py-1.5 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25"
             >
               {copied ? "Copied!" : "Copy Token"}
             </button>
             <button
               onClick={copyConfig}
-              className="btn px-3 py-1.5 bg-amber-100 text-amber-800 hover:bg-amber-200"
+              className="btn px-3 py-1.5 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25"
             >
               Copy Claude Config
             </button>
@@ -175,18 +175,18 @@ export default function McpTokenManager({ userId }: { userId: string }) {
 
       {/* Token list */}
       {loading ? (
-        <p className="text-sm text-stone-400">Loading tokens...</p>
+        <p className="text-sm text-stone-500">Loading tokens...</p>
       ) : tokens.length === 0 ? (
-        <p className="text-sm text-stone-400">No active tokens.</p>
+        <p className="text-sm text-stone-500">No active tokens.</p>
       ) : (
         <div className="space-y-2">
           {tokens.map((token) => (
             <div
               key={token.id}
-              className="flex items-center justify-between p-3 bg-stone-50 rounded-xl border border-stone-200/70"
+              className="flex items-center justify-between p-3 bg-white/[0.04] rounded-xl border border-white/[0.08]"
             >
               <div>
-                <p className="text-sm font-medium text-stone-900">{token.name}</p>
+                <p className="text-sm font-medium text-stone-100">{token.name}</p>
                 <p className="text-xs text-stone-500">
                   Created {new Date(token.created_at).toLocaleDateString()}
                   {token.last_used_at && (

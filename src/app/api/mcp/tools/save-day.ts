@@ -17,7 +17,7 @@ export function registerSaveDayTool(
 ) {
   server.tool(
     "save_day",
-    "Upsert daily log + activity state for a date in one call. Set pain_level / notes (daily log). Notes default to append mode — new text is added after existing notes. Use notes_mode='write' to replace. Per activity: completed (bool, marks complete/incomplete), note (string, adds note — append by default, set note_mode='write' to replace), delete (bool, removes the completion row entirely). clear_log=true deletes the daily_logs row for the date. All activity codes are validated; if any are unknown the whole request is rejected.",
+    "Upsert daily log + activity state for a date in one call. Set pain_level / notes (daily log). Notes default to append mode — new text is added after existing notes. Use notes_mode='write' to replace. Per activity: completed (bool, marks complete/incomplete), note (string, adds note — append by default, set note_mode='write' to replace), delete (bool, removes the completion row entirely). clear_log=true deletes the daily_logs row for the date. All activity codes are validated; if any are unknown the whole request is rejected. PROTOCOL: during a logging session, notes accumulate in phases: baseline pain → post-exercise pain after each block → post-session summary. Use append mode mid-session; never overwrite earlier phases. At session end, mark the day's activity complete here. Follow the workout-logging prompt for the full session protocol.",
     {
       date: dateSchema.describe("Date in YYYY-MM-DD format"),
       pain_level: z

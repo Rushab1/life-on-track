@@ -155,19 +155,22 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
       <div className="max-w-xl md:max-w-2xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" aria-hidden="true" />
-            <h1 className="text-xl font-bold tracking-tight text-stone-900">
+          <div className="flex items-center gap-2.5">
+            <span
+              className="w-2.5 h-2.5 rounded-full bg-indigo-400 shadow-[0_0_10px_rgb(129_140_248_/_0.9)]"
+              aria-hidden="true"
+            />
+            <h1 className="text-xl font-bold tracking-tight text-stone-100">
               Life on Track
             </h1>
           </div>
           <div className="flex items-center gap-3">
             {/* Autosave status */}
             {dailyLog.saving && (
-              <span className="text-xs text-stone-400">Saving...</span>
+              <span className="text-xs text-stone-500">Saving...</span>
             )}
             {dailyLog.saved && (
-              <span className="text-xs text-emerald-600">Saved</span>
+              <span className="text-xs text-emerald-400">Saved</span>
             )}
             <button onClick={onSignOut} className="btn btn-ghost text-sm">
               Sign out
@@ -181,8 +184,8 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
             role="status"
             className={`flex items-center justify-between px-4 py-2.5 rounded-xl mb-4 text-sm border ${
               toast.type === "success"
-                ? "bg-emerald-50 text-emerald-800 border-emerald-200/70"
-                : "bg-rose-50 text-rose-800 border-rose-200/70"
+                ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+                : "bg-rose-500/10 text-rose-300 border-rose-500/20"
             }`}
           >
             <span>{toast.message}</span>
@@ -200,25 +203,25 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
           <button
             onClick={goToPrevDay}
             aria-label="Previous day"
-            className="p-2 rounded-full text-stone-500 hover:text-stone-900 hover:bg-stone-200/70 transition-colors"
+            className="p-2 rounded-full text-stone-500 hover:text-stone-100 hover:bg-white/[0.06] transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <div className="text-center">
-            <p className="text-sm font-semibold text-stone-900">{dayName}</p>
+            <p className="text-sm font-semibold text-stone-100">{dayName}</p>
             <p className="text-xs text-stone-500">{dateDisplay}</p>
             {!isToday && (
               <button
                 onClick={goToToday}
-                className="text-xs text-indigo-600 hover:text-indigo-700 font-medium mt-0.5 transition-colors"
+                className="text-xs text-indigo-400 hover:text-indigo-300 font-medium mt-0.5 transition-colors"
               >
                 Jump to today
               </button>
             )}
             {activePlan && (
-              <p className="text-[10px] text-stone-400 mt-0.5">
+              <p className="text-[10px] text-stone-500 mt-0.5">
                 {activePlan.name}
               </p>
             )}
@@ -226,7 +229,7 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
           <button
             onClick={goToNextDay}
             aria-label="Next day"
-            className="p-2 rounded-full text-stone-500 hover:text-stone-900 hover:bg-stone-200/70 transition-colors"
+            className="p-2 rounded-full text-stone-500 hover:text-stone-100 hover:bg-white/[0.06] transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -235,15 +238,15 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-stone-200/70 rounded-xl p-1 mb-6">
+        <div className="flex gap-1 bg-white/[0.04] border border-white/[0.06] rounded-xl p-1 mb-6">
           {(["day", "calendar", "plans", "settings"] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
                 tab === t
-                  ? "bg-white text-indigo-700 shadow-sm"
-                  : "text-stone-500 hover:text-stone-700"
+                  ? "bg-white/[0.08] text-stone-100 shadow-[inset_0_1px_0_rgb(255_255_255_/_0.08)]"
+                  : "text-stone-500 hover:text-stone-300"
               }`}
             >
               {t === "day" ? "Day" : t === "calendar" ? "Calendar" : t === "plans" ? "Plan & Customize" : "Settings"}
@@ -295,11 +298,11 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
             <div className="card flex items-center justify-between px-4 py-2.5">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-xs text-stone-500">Today:</span>
-                <span className="text-sm font-medium text-stone-800 truncate">
+                <span className="text-sm font-medium text-stone-200 truncate">
                   {gymLabel}
                 </span>
                 {dayOverride && (
-                  <span className="badge bg-amber-100 text-amber-700">
+                  <span className="badge bg-amber-500/15 text-amber-300">
                     Swapped
                   </span>
                 )}
@@ -308,12 +311,12 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
                 <button
                   type="button"
                   onClick={() => setShowSwap((s) => !s)}
-                  className="text-xs text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
+                  className="text-xs text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
                 >
                   Swap workout
                 </button>
                 {showSwap && (
-                  <div className="absolute right-0 top-6 z-10 bg-white border border-stone-200 rounded-xl shadow-lg min-w-[160px] py-1 overflow-hidden">
+                  <div className="menu absolute right-0 top-6 z-10 min-w-[160px] py-1">
                     {gymOptions.map((opt) => (
                       <button
                         key={opt.value}
@@ -322,21 +325,21 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
                           await setOverride(opt.value);
                           setShowSwap(false);
                         }}
-                        className="block w-full text-left px-3 py-1.5 text-xs text-stone-700 hover:bg-stone-50"
+                        className="block w-full text-left px-3 py-1.5 text-xs text-stone-300 hover:bg-white/[0.06]"
                       >
                         {opt.label}
                       </button>
                     ))}
                     {dayOverride && (
                       <>
-                        <div className="border-t border-stone-100 my-1" />
+                        <div className="border-t border-white/[0.06] my-1" />
                         <button
                           type="button"
                           onClick={async () => {
                             await setOverride(null);
                             setShowSwap(false);
                           }}
-                          className="block w-full text-left px-3 py-1.5 text-xs text-rose-500 hover:bg-rose-50"
+                          className="block w-full text-left px-3 py-1.5 text-xs text-rose-400 hover:bg-rose-500/10"
                         >
                           Clear override
                         </button>
@@ -407,7 +410,7 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
                 ) : (
                   <button
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="w-full py-2.5 text-rose-500 text-sm hover:text-rose-700 transition-colors"
+                    className="w-full py-2.5 text-rose-400/80 text-sm hover:text-rose-300 transition-colors"
                   >
                     Delete this day&apos;s log
                   </button>

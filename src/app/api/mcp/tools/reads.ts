@@ -26,7 +26,7 @@ export function registerReadTools(
 ) {
   server.tool(
     "get_day",
-    "Get everything for a single date in one call: pain level, notes, active plan (with exercise templates), any day override, scheduled + ad-hoc activities, workout sets grouped by exercise, widget values, life events, Google Calendar events, and Oura Ring metrics (sleep/readiness/activity scores, HRV, resting HR, steps). This is the canonical starting tool — call it first when the user asks about a day.",
+    'Get everything for a single date in one call: pain level, notes, active plan (with exercise templates), any day override, scheduled + ad-hoc activities, workout sets grouped by exercise, widget values, life events, Google Calendar events, and Oura Ring metrics (sleep/readiness/activity scores, HRV, resting HR, steps). This is the canonical starting tool — call it first when the user asks about a day. WORKOUT LOGGING PROTOCOL — call this FIRST. After showing notes + plan, collect a baseline pain panel (multiple-choice body parts drawn from the last 7 days of logs and today\'s notes) BEFORE any sets are discussed, and persist it with save_day. Then follow the per-set protocol described on log_workout. Follow the workout-logging prompt for the full session protocol.',
     { date: dateSchema.describe("Date in YYYY-MM-DD format") },
     async ({ date }) => {
       const [
@@ -258,7 +258,7 @@ export function registerReadTools(
 
   server.tool(
     "get_history",
-    "Get history across a date range. Mode A (range summary): provide start_date and/or end_date (default: last 7 days) — returns avg pain, activity completion rates, workout days, and total exercises. Mode B (progressive overload): provide exercises (and optionally before_date, default today) — returns the most recent sessions per exercise before that date. Use `sessions` to control how many recent sessions per exercise are returned (default 3).",
+    "Get history across a date range or recent sessions per exercise. Mode A (range summary): provide start_date and/or end_date (default: last 7 days) — returns avg pain, activity completion rates, workout days, and total exercises. Mode B (progressive overload): provide exercises (and optionally before_date, default today) — returns the most recent sessions per exercise before that date. Use `sessions` to control how many recent sessions per exercise are returned (default 3). PROTOCOL: use Mode B (per-exercise recent sessions) BEFORE offering set options, so options reflect the user's actual prior numbers. Also use at session end to compare today's cardio/HR-zone work against the most recent session of the same activity. Follow the workout-logging prompt for the full session protocol.",
     {
       start_date: dateSchema
         .optional()

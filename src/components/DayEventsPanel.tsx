@@ -34,15 +34,15 @@ export default function DayEventsPanel({ userId, dateStr, refreshKey }: Props) {
 
   return (
     <div className="card p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-stone-900">Calendar &amp; Events</h3>
+      <h3 className="text-sm font-semibold text-stone-100">Calendar &amp; Events</h3>
 
       {/* Read-only events imported from Google Calendar */}
       {calendarEvents.length > 0 && (
         <div className="space-y-1.5">
           {calendarEvents.map((e) => (
             <div key={e.id} className="flex items-center gap-2 text-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />
-              <span className="text-stone-400 text-xs w-24 flex-shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0" />
+              <span className="text-stone-500 text-xs w-24 flex-shrink-0">
                 {e.all_day
                   ? "All day"
                   : `${fmtTime(e.start_time)}${
@@ -54,16 +54,16 @@ export default function DayEventsPanel({ userId, dateStr, refreshKey }: Props) {
                   href={e.html_link}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-stone-800 hover:underline truncate"
+                  className="text-stone-200 hover:underline truncate"
                 >
                   {e.title}
                 </a>
               ) : (
-                <span className="text-stone-800 truncate">{e.title}</span>
+                <span className="text-stone-200 truncate">{e.title}</span>
               )}
             </div>
           ))}
-          <p className="text-[10px] text-stone-400">
+          <p className="text-[10px] text-stone-500">
             From Google Calendar · read-only
           </p>
         </div>
@@ -74,11 +74,11 @@ export default function DayEventsPanel({ userId, dateStr, refreshKey }: Props) {
         <div className="space-y-1.5">
           {lifeEvents.map((e) => (
             <div key={e.id} className="flex items-center gap-2 text-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
-              <span className="text-stone-800 truncate flex-1">{e.title}</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+              <span className="text-stone-200 truncate flex-1">{e.title}</span>
               <button
                 onClick={() => deleteLifeEvent(e.id)}
-                className="btn btn-danger-ghost text-xs px-1.5 py-0.5 text-stone-400 hover:text-rose-600"
+                className="btn btn-danger-ghost text-xs px-1.5 py-0.5 text-stone-500 hover:text-rose-300"
                 aria-label="Delete event"
               >
                 ✕

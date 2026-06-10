@@ -154,14 +154,14 @@ export default function AuthorizePage() {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="w-full max-w-sm">
-          <h1 className="text-2xl font-bold tracking-tight text-stone-900 text-center mb-2">Life on Track</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-stone-100 text-center mb-2">Life on Track</h1>
           <p className="text-stone-500 text-center text-sm mb-8">
             Sign in to authorize access to your data
           </p>
           <div className="card p-6">
             {magicLinkSent ? (
               <div className="text-center">
-                <p className="text-stone-900 font-medium mb-2">Check your email</p>
+                <p className="text-stone-100 font-medium mb-2">Check your email</p>
                 <p className="text-stone-500 text-sm">
                   We sent a magic link to <strong>{email}</strong>
                 </p>
@@ -180,7 +180,7 @@ export default function AuthorizePage() {
                   required
                   className="input mb-4"
                 />
-                {error && <p className="text-rose-500 text-sm mb-4">{error}</p>}
+                {error && <p className="text-rose-400 text-sm mb-4">{error}</p>}
                 <button
                   type="submit"
                   disabled={loading}
@@ -200,7 +200,7 @@ export default function AuthorizePage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-stone-400">Loading...</p>
+        <p className="text-stone-500">Loading...</p>
       </div>
     );
   }
@@ -209,24 +209,24 @@ export default function AuthorizePage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-bold tracking-tight text-stone-900 text-center mb-2">Authorize Access</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-stone-100 text-center mb-2">Authorize Access</h1>
         <p className="text-stone-500 text-center text-sm mb-8">
           An application wants to access your Life on Track data
         </p>
         <div className="card p-6">
           <div className="mb-6">
-            <p className="text-sm text-stone-700 mb-3">This will allow the application to:</p>
-            <ul className="text-sm text-stone-600 space-y-1.5 ml-4 list-disc">
+            <p className="text-sm text-stone-300 mb-3">This will allow the application to:</p>
+            <ul className="text-sm text-stone-400 space-y-1.5 ml-4 list-disc">
               <li>Read and write your daily logs</li>
               <li>Read and write your activities</li>
               <li>Read and write your workouts</li>
               <li>Read and write your plans</li>
             </ul>
           </div>
-          <p className="text-xs text-stone-400 mb-4">
+          <p className="text-xs text-stone-500 mb-4">
             Signed in as {session?.user?.email}
           </p>
-          {error && <p className="text-rose-500 text-sm mb-4">{error}</p>}
+          {error && <p className="text-rose-400 text-sm mb-4">{error}</p>}
           <div className="flex gap-3">
             <button
               onClick={handleDeny}

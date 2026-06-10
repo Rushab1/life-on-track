@@ -62,17 +62,17 @@ export default function Calendar({
         <button
           onClick={prevMonth}
           aria-label="Previous month"
-          className="p-1.5 rounded-full text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition-colors"
+          className="p-1.5 rounded-full text-stone-500 hover:text-stone-100 hover:bg-white/[0.08] transition-colors"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <h3 className="text-sm font-semibold text-stone-900">{monthLabel}</h3>
+        <h3 className="text-sm font-semibold text-stone-100">{monthLabel}</h3>
         <button
           onClick={nextMonth}
           aria-label="Next month"
-          className="p-1.5 rounded-full text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition-colors"
+          className="p-1.5 rounded-full text-stone-500 hover:text-stone-100 hover:bg-white/[0.08] transition-colors"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -83,7 +83,7 @@ export default function Calendar({
       {/* Day headers */}
       <div className="grid grid-cols-7 gap-1 mb-1">
         {DAY_NAMES.map((d) => (
-          <div key={d} className="text-center text-xs font-medium text-stone-400 py-1">
+          <div key={d} className="text-center text-xs font-medium text-stone-500 py-1">
             {d}
           </div>
         ))}
@@ -108,15 +108,15 @@ export default function Calendar({
               onClick={() => onSelectDate(cellDate)}
               className={`relative aspect-square flex items-center justify-center text-sm rounded-lg transition-colors ${
                 isSelected
-                  ? "bg-indigo-600 text-white"
+                  ? "bg-indigo-500 text-white shadow-[0_0_12px_rgb(99_102_241_/_0.5)]"
                   : isToday
-                    ? "ring-1 ring-inset ring-indigo-600 text-indigo-700 font-semibold"
-                    : "text-stone-700 hover:bg-stone-50"
+                    ? "ring-1 ring-inset ring-indigo-400 text-indigo-300 font-semibold"
+                    : "text-stone-300 hover:bg-white/[0.06]"
               }`}
             >
               {day}
               {hasLog && !isSelected && (
-                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-indigo-600" />
+                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-indigo-400" />
               )}
               {hasLog && isSelected && (
                 <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white" />

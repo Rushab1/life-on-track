@@ -33,15 +33,15 @@ export default function AuthForm() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center gap-2 mb-8">
-          <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" aria-hidden="true" />
-          <h1 className="text-2xl font-bold tracking-tight text-stone-900 text-center">
+          <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 shadow-[0_0_10px_rgb(129_140_248_/_0.9)]" aria-hidden="true" />
+          <h1 className="text-2xl font-bold tracking-tight text-stone-100 text-center">
             Life on Track
           </h1>
         </div>
         <div className="card p-6">
           {sent ? (
             <div className="text-center">
-              <p className="text-stone-900 font-medium mb-2">Check your email</p>
+              <p className="text-stone-100 font-medium mb-2">Check your email</p>
               <p className="text-stone-500 text-sm">
                 We sent a magic link to <strong>{email}</strong>
               </p>
@@ -61,7 +61,7 @@ export default function AuthForm() {
                 className="input mb-4"
               />
               {error && (
-                <p className="text-rose-500 text-sm mb-4">{error}</p>
+                <p className="text-rose-400 text-sm mb-4">{error}</p>
               )}
               <button
                 type="submit"
@@ -73,12 +73,12 @@ export default function AuthForm() {
             </form>
           )}
         </div>
-        <p className="text-center text-xs text-stone-400 mt-6">
-          <a href="/privacy" className="hover:text-stone-600 transition-colors">
+        <p className="text-center text-xs text-stone-500 mt-6">
+          <a href="/privacy" className="hover:text-stone-300 transition-colors">
             Privacy Policy
           </a>
           <span className="mx-2">·</span>
-          <a href="/terms" className="hover:text-stone-600 transition-colors">
+          <a href="/terms" className="hover:text-stone-300 transition-colors">
             Terms of Service
           </a>
         </p>

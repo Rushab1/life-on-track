@@ -8,6 +8,7 @@ import { registerWidgetTools } from "./widgets";
 import { registerLifeEventTool } from "./life-events";
 import { registerCalendarTool } from "./google-calendar";
 import { registerCatalogTools } from "./catalog";
+import { registerPrompts } from "./prompts";
 
 /**
  * Consolidated tool surface. Replaces the old 34-tool layout with a compact
@@ -21,6 +22,10 @@ import { registerCatalogTools } from "./catalog";
  * Calendar (1):  sync_calendar
  *
  * Total: 13 tools.
+ *
+ * Prompts (1): workout-logging — the canonical workout logging protocol
+ * (see prompts.ts). Tool descriptions carry condensed copies for clients
+ * that do not auto-inject MCP prompts.
  */
 export function registerAllTools(
   server: McpServer,
@@ -35,4 +40,5 @@ export function registerAllTools(
   registerLifeEventTool(server, client, userId);
   registerCalendarTool(server, client, userId);
   registerCatalogTools(server, client, userId);
+  registerPrompts(server);
 }

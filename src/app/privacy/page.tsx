@@ -9,14 +9,14 @@ const UPDATED = "June 11, 2026";
 export default function PrivacyPage() {
   return (
     <div className="max-w-xl mx-auto px-4 py-10">
-      <h1 className="text-2xl font-bold tracking-tight text-stone-900 mb-1">
+      <h1 className="text-2xl font-bold tracking-tight text-stone-100 mb-1">
         Privacy Policy
       </h1>
-      <p className="text-xs text-stone-400 mb-8">Last updated {UPDATED}</p>
+      <p className="text-xs text-stone-500 mb-8">Last updated {UPDATED}</p>
 
-      <div className="card p-6 space-y-6 text-sm text-stone-700 leading-relaxed">
+      <div className="card p-6 space-y-6 text-sm text-stone-300 leading-relaxed">
         <section>
-          <h2 className="font-semibold text-stone-900 mb-2">What Life on Track is</h2>
+          <h2 className="font-semibold text-stone-100 mb-2">What Life on Track is</h2>
           <p>
             Life on Track is a personal life-tracking app: daily logs, workouts,
             activities, notes, and optional integrations with Google Calendar
@@ -26,7 +26,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-semibold text-stone-900 mb-2">Data we store</h2>
+          <h2 className="font-semibold text-stone-100 mb-2">Data we store</h2>
           <ul className="list-disc ml-5 space-y-1.5">
             <li>Your account email (used to sign you in via magic link).</li>
             <li>
@@ -49,7 +49,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-semibold text-stone-900 mb-2">Where it lives and who can see it</h2>
+          <h2 className="font-semibold text-stone-100 mb-2">Where it lives and who can see it</h2>
           <p>
             Data is stored in Supabase (Postgres) with row-level security: every
             row is keyed to your user id and only readable by you. The app is
@@ -59,11 +59,11 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-semibold text-stone-900 mb-2">Third-party APIs</h2>
+          <h2 className="font-semibold text-stone-100 mb-2">Third-party APIs</h2>
           <p>
             Google Calendar data is accessed per the{" "}
             <a
-              className="text-indigo-600 hover:text-indigo-700 underline"
+              className="text-indigo-400 hover:text-indigo-300 underline"
               href="https://developers.google.com/terms/api-services-user-data-policy"
             >
               Google API Services User Data Policy
@@ -75,7 +75,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-semibold text-stone-900 mb-2">AI assistant access (MCP)</h2>
+          <h2 className="font-semibold text-stone-100 mb-2">AI assistant access (MCP)</h2>
           <p>
             You can optionally authorize an AI assistant (e.g. Claude) to read
             and write your data through the app&apos;s MCP API. That access uses
@@ -85,7 +85,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-semibold text-stone-900 mb-2">Deleting your data</h2>
+          <h2 className="font-semibold text-stone-100 mb-2">Deleting your data</h2>
           <p>
             Disconnecting Google or Oura in Settings revokes the grant and
             deletes the stored tokens immediately. Day logs can be deleted in
@@ -95,11 +95,11 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="font-semibold text-stone-900 mb-2">Contact</h2>
+          <h2 className="font-semibold text-stone-100 mb-2">Contact</h2>
           <p>
             Questions or deletion requests:{" "}
             <a
-              className="text-indigo-600 hover:text-indigo-700 underline"
+              className="text-indigo-400 hover:text-indigo-300 underline"
               href="mailto:rushabmunot1@gmail.com"
             >
               rushabmunot1@gmail.com
