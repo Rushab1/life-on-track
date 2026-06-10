@@ -73,6 +73,15 @@ export default function AuthForm() {
             </form>
           )}
         </div>
+        <p className="text-center text-xs text-stone-400 mt-6">
+          <a href="/privacy" className="hover:text-stone-600 transition-colors">
+            Privacy Policy
+          </a>
+          <span className="mx-2">·</span>
+          <a href="/terms" className="hover:text-stone-600 transition-colors">
+            Terms of Service
+          </a>
+        </p>
       </div>
     </div>
   );
