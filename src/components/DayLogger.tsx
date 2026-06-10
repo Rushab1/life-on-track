@@ -13,6 +13,7 @@ import { useDayOverride } from "@/hooks/useDayOverride";
 import { useWorkoutSets } from "@/hooks/useWorkoutSets";
 import PainSlider from "./PainSlider";
 import ActivityChecklist from "./ActivityChecklist";
+import DayWidgets from "./DayWidgets";
 import WorkoutLogger from "./WorkoutLogger";
 import DailyNotes from "./DailyNotes";
 import DayEventsPanel from "./DayEventsPanel";
@@ -364,6 +365,13 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
               activityLabels={activityLabels}
               onToggle={activityData.toggle}
               onSetNote={activityData.setNote}
+            />
+
+            <DayWidgets
+              userId={userId}
+              dateStr={dateStr}
+              activities={activities}
+              activityLabels={activityLabels}
             />
 
             {showWorkout && (
