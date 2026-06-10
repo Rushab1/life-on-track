@@ -11,7 +11,6 @@ import { useCustomTopics } from "@/hooks/useCustomTopics";
 import { useExercises } from "@/hooks/useExercises";
 import { useDayOverride } from "@/hooks/useDayOverride";
 import { useWorkoutSets } from "@/hooks/useWorkoutSets";
-import PainSlider from "./PainSlider";
 import ActivityChecklist from "./ActivityChecklist";
 import DayWidgets from "./DayWidgets";
 import WorkoutLogger from "./WorkoutLogger";
@@ -352,11 +351,6 @@ export default function DayLogger({ userId, onSignOut }: DayLoggerProps) {
             </div>
 
             <OuraPanel userId={userId} dateStr={dateStr} refresh={ouraRefresh} />
-
-            <PainSlider
-              value={dailyLog.painLevel}
-              onChange={dailyLog.setPainLevel}
-            />
 
             <ActivityChecklist
               activities={activities}
