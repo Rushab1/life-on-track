@@ -2,12 +2,18 @@
 
 import { useState, useMemo } from "react";
 import {
-  DEFAULT_GYM_SCHEDULE,
-  DEFAULT_PREP_SCHEDULE,
-} from "@/config/schedule";
+  PLAN_TEMPLATES,
+  topicCode,
+  type PlanTemplate,
+} from "@/config/planTemplates";
+import { toDateString, addDays } from "@/lib/dates";
 import type { Plan, CustomTopic, WorkoutMeta } from "@/lib/types";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const EMPTY_WEEK: Record<string, string> = {
+  "0": "rst", "1": "rst", "2": "rst", "3": "rst", "4": "rst", "5": "rst", "6": "rst",
+};
 
 interface PlanManagerProps {
   plans: Plan[];
@@ -63,6 +69,21 @@ export default function PlanManager({
   const [editing, setEditing] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [showManage, setShowManage] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [newPlanTemplate, setNewPlanTemplate] = useState<PlanTemplate | "blank" | null>(null);
+
+  // Create any custom activity topics the template references that the user
+  // doesn't have yet, so its schedule renders with proper labels.
+  async function pickTemplate(t: PlanTemplate) {
+    const existing = new Set(prepOptions.map((o) => o.value));
+    for (const label of t.topics) {
+      if (!existing.has(topicCode(label))) {
+        await onAddTopic("activity", label);
+      }
+    }
+    setNewPlanTemplate(t);
+    setShowPicker(false);
+  }
 
   return (
     <div className="space-y-4">
@@ -154,9 +175,10 @@ export default function PlanManager({
         </div>
       ))}
 
-      {/* Create new plan */}
-      {editing === "new" ? (
+      {/* Create new plan: picker → form */}
+      {newPlanTemplate ? (
         <PlanForm
+          template={newPlanTemplate === "blank" ? undefined : newPlanTemplate}
           gymOptions={gymOptions}
           prepOptions={prepOptions}
           allExercises={allExercises}
@@ -164,13 +186,55 @@ export default function PlanManager({
           onAddExercise={onAddExercise}
           onSave={async (data) => {
             await onCreate(data);
-            setEditing(null);
+            setNewPlanTemplate(null);
           }}
-          onCancel={() => setEditing(null)}
+          onCancel={() => setNewPlanTemplate(null)}
         />
+      ) : showPicker ? (
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-stone-100">
+              Start from a template
+            </h3>
+            <button
+              onClick={() => setShowPicker(false)}
+              className="btn btn-ghost text-xs px-2 py-1"
+            >
+              Cancel
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {PLAN_TEMPLATES.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => void pickTemplate(t)}
+                className="text-left p-3 rounded-xl bg-white/[0.04] border border-white/[0.06]
+                           hover:bg-white/[0.08] hover:border-white/15 transition-colors
+                           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60"
+              >
+                <p className="text-sm font-medium text-stone-200">
+                  <span className="mr-1.5">{t.emoji}</span>
+                  {t.name}
+                </p>
+                <p className="text-xs text-stone-500 mt-1">{t.description}</p>
+              </button>
+            ))}
+            <button
+              onClick={() => setNewPlanTemplate("blank")}
+              className="text-left p-3 rounded-xl border-2 border-dashed border-white/15
+                         hover:border-white/25 transition-colors
+                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60"
+            >
+              <p className="text-sm font-medium text-stone-400">＋ Blank plan</p>
+              <p className="text-xs text-stone-500 mt-1">
+                Start from scratch — all days rest, no activities.
+              </p>
+            </button>
+          </div>
+        </div>
       ) : (
         <button
-          onClick={() => setEditing("new")}
+          onClick={() => setShowPicker(true)}
           className="w-full py-3 border-2 border-dashed border-white/15 text-stone-500 rounded-2xl text-sm font-medium hover:border-white/25 hover:text-stone-200 transition-colors"
         >
           + Create new plan
@@ -219,6 +283,7 @@ export default function PlanManager({
 /** Reusable form for creating / editing a plan. */
 function PlanForm({
   initial,
+  template,
   gymOptions,
   prepOptions,
   allExercises,
@@ -228,6 +293,7 @@ function PlanForm({
   onCancel,
 }: {
   initial?: Plan;
+  template?: PlanTemplate;
   gymOptions: { value: string; label: string }[];
   prepOptions: { value: string; label: string }[];
   allExercises: string[];
@@ -247,18 +313,25 @@ function PlanForm({
   }) => Promise<void>;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState(initial?.name ?? "");
-  const [startDate, setStartDate] = useState(initial?.start_date ?? "");
-  const [endDate, setEndDate] = useState(initial?.end_date ?? "");
+  const [name, setName] = useState(initial?.name ?? template?.name ?? "");
+  const [startDate, setStartDate] = useState(
+    initial?.start_date ?? (template ? toDateString(new Date()) : "")
+  );
+  const [endDate, setEndDate] = useState(
+    initial?.end_date ?? (template ? toDateString(addDays(new Date(), 8 * 7)) : "")
+  );
   const [gymSchedule, setGymSchedule] = useState<Record<string, string>>(
-    initial?.gym_schedule ?? { ...DEFAULT_GYM_SCHEDULE }
+    initial?.gym_schedule ?? { ...(template?.gym_schedule ?? EMPTY_WEEK) }
   );
   const [prepSchedule, setPrepSchedule] = useState<Record<string, string[]>>(
-    initial?.prep_schedule ?? JSON.parse(JSON.stringify(DEFAULT_PREP_SCHEDULE))
+    JSON.parse(JSON.stringify(initial?.prep_schedule ?? template?.prep_schedule ?? {}))
   );
   const [workoutTemplates, setWorkoutTemplates] = useState<
     Record<string, string[]>
-  >(initial?.workout_templates ?? {});
+  >(
+    initial?.workout_templates ??
+      JSON.parse(JSON.stringify(template?.workout_templates ?? {}))
+  );
   const [workoutMeta, setWorkoutMeta] = useState<
     Record<string, WorkoutMeta>
   >(initial?.workout_meta ?? {});

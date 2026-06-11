@@ -4,9 +4,8 @@ import {
   getActivitiesForDate,
   isWorkoutDay,
   getGymLabel,
-  DEFAULT_GYM_SCHEDULE,
-  DEFAULT_PREP_SCHEDULE,
 } from "@/config/schedule";
+import { PLAN_TEMPLATES, topicCode } from "@/config/planTemplates";
 import type { Plan } from "@/lib/types";
 
 // Helpers — construct dates for specific days of week
@@ -17,20 +16,23 @@ function dateForDay(dayOfWeek: number): Date {
   return d;
 }
 
+// Fixture plan (the old hardcoded default schedule is gone — plans now come
+// from templates or are built from scratch).
 const FULL_PLAN = {
-  gym_schedule: DEFAULT_GYM_SCHEDULE,
-  prep_schedule: DEFAULT_PREP_SCHEDULE,
+  gym_schedule: {
+    "0": "rst",
+    "1": "psh",
+    "2": "lgh",
+    "3": "rst",
+    "4": "lgl",
+    "5": "pll",
+    "6": "yga",
+  },
+  prep_schedule: {
+    "1": ["vln", "lc"],
+    "2": ["ml"],
+  },
 } as unknown as Plan;
-
-describe("DEFAULT_GYM_SCHEDULE", () => {
-  it("Sunday is rest", () => expect(DEFAULT_GYM_SCHEDULE["0"]).toBe("rst"));
-  it("Monday is push", () => expect(DEFAULT_GYM_SCHEDULE["1"]).toBe("psh"));
-  it("Tuesday is legs heavy", () => expect(DEFAULT_GYM_SCHEDULE["2"]).toBe("lgh"));
-  it("Wednesday is rest", () => expect(DEFAULT_GYM_SCHEDULE["3"]).toBe("rst"));
-  it("Thursday is legs light", () => expect(DEFAULT_GYM_SCHEDULE["4"]).toBe("lgl"));
-  it("Friday is pull", () => expect(DEFAULT_GYM_SCHEDULE["5"]).toBe("pll"));
-  it("Saturday is yoga", () => expect(DEFAULT_GYM_SCHEDULE["6"]).toBe("yga"));
-});
 
 describe("getGymType", () => {
   it("returns rst when no plan", () => {
@@ -89,10 +91,8 @@ describe("getActivitiesForDate", () => {
 
   it("includes prep activities with a plan", () => {
     const activities = getActivitiesForDate(dateForDay(1), FULL_PLAN);
-    const prep = DEFAULT_PREP_SCHEDULE["1"];
-    for (const p of prep) {
-      expect(activities).toContain(p);
-    }
+    expect(activities).toContain("vln");
+    expect(activities).toContain("lc");
   });
 
   it("uses plan schedules when provided", () => {
@@ -120,5 +120,38 @@ describe("getGymLabel", () => {
   it("uses custom labels when provided", () => {
     const label = getGymLabel(dateForDay(1), FULL_PLAN, { psh: "Push Day" });
     expect(label).toBe("Push Day");
+  });
+});
+
+describe("PLAN_TEMPLATES", () => {
+  it("every template covers all 7 days of gym_schedule", () => {
+    for (const t of PLAN_TEMPLATES) {
+      for (let d = 0; d <= 6; d++) {
+        expect(t.gym_schedule[String(d)], `${t.id} day ${d}`).toBeTruthy();
+      }
+    }
+  });
+
+  it("template ids are unique", () => {
+    const ids = PLAN_TEMPLATES.map((t) => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("custom prep codes are covered by the template's topics", () => {
+    for (const t of PLAN_TEMPLATES) {
+      const provided = new Set(t.topics.map(topicCode));
+      for (const codes of Object.values(t.prep_schedule)) {
+        for (const code of codes) {
+          if (code.startsWith("c_")) {
+            expect(provided.has(code), `${t.id}: ${code}`).toBe(true);
+          }
+        }
+      }
+    }
+  });
+
+  it("topicCode matches the addTopic derivation", () => {
+    expect(topicCode("Meal Planning")).toBe("c_meal_planning");
+    expect(topicCode("Tidy Up")).toBe("c_tidy_up");
   });
 });
