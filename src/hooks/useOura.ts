@@ -19,6 +19,9 @@ export interface OuraDaily {
   high_activity_minutes: number | null;
   medium_activity_minutes: number | null;
   low_activity_minutes: number | null;
+  sedentary_minutes: number | null;
+  rest_minutes: number | null;
+  non_wear_minutes: number | null;
 }
 
 export interface OuraWorkout {

@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { toDateString, addDays } from "@/lib/dates";
 import { verifyState } from "@/lib/oauthState";
-import { syncOuraDaily } from "@/lib/oura/client";
+import { syncOuraDaily, ensureOuraUserId } from "@/lib/oura/client";
 import { OURA_TOKEN_URL } from "@/lib/oura/tokens";
 
 const OURA_CLIENT_ID = process.env.OURA_CLIENT_ID!;
@@ -73,6 +73,13 @@ export async function GET(req: Request): Promise<Response> {
   if (dbError) {
     console.error("[Oura OAuth] DB error:", dbError);
     return NextResponse.redirect(new URL("/?oura=error", req.url));
+  }
+
+  // Store Oura's user id so webhook events can be routed back to this user.
+  try {
+    await ensureOuraUserId(admin, userId);
+  } catch (err) {
+    console.error("[Oura OAuth] personal_info lookup failed", err);
   }
 
   // Best-effort initial backfill (last 30 days) so the UI has data right away.

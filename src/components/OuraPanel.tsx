@@ -71,6 +71,47 @@ function fmtDuration(start: string | null, end: string | null): string | null {
   return mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
 }
 
+function fmtMins(mins: number): string {
+  if (mins >= 60) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m ? `${h}h ${m}m` : `${h}h`;
+  }
+  return `${mins}m`;
+}
+
+// Oura's six activity-intensity zones (0-5), highest intensity first.
+const ACTIVITY_ZONES: {
+  zone: number;
+  label: string;
+  field: keyof Pick<
+    OuraDailyZones,
+    | "high_activity_minutes"
+    | "medium_activity_minutes"
+    | "low_activity_minutes"
+    | "sedentary_minutes"
+    | "rest_minutes"
+    | "non_wear_minutes"
+  >;
+  color: string;
+}[] = [
+  { zone: 5, label: "High", field: "high_activity_minutes", color: "text-rose-300" },
+  { zone: 4, label: "Medium", field: "medium_activity_minutes", color: "text-amber-300" },
+  { zone: 3, label: "Low", field: "low_activity_minutes", color: "text-emerald-300" },
+  { zone: 2, label: "Inactive", field: "sedentary_minutes", color: "text-sky-300" },
+  { zone: 1, label: "Rest", field: "rest_minutes", color: "text-indigo-300" },
+  { zone: 0, label: "Non-wear", field: "non_wear_minutes", color: "text-stone-400" },
+];
+
+type OuraDailyZones = {
+  high_activity_minutes: number | null;
+  medium_activity_minutes: number | null;
+  low_activity_minutes: number | null;
+  sedentary_minutes: number | null;
+  rest_minutes: number | null;
+  non_wear_minutes: number | null;
+};
+
 const INTENSITY_BADGE: Record<string, string> = {
   easy: "bg-emerald-500/15 text-emerald-300",
   moderate: "bg-amber-500/15 text-amber-300",
@@ -119,9 +160,7 @@ export default function OuraPanel({
 
   const hasIntensity =
     daily != null &&
-    (daily.high_activity_minutes != null ||
-      daily.medium_activity_minutes != null ||
-      daily.low_activity_minutes != null);
+    ACTIVITY_ZONES.some((z) => daily[z.field] != null);
 
   return (
     <div className="card p-5">
@@ -150,20 +189,26 @@ export default function OuraPanel({
         </div>
       )}
       {hasIntensity && daily && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-400 mt-3">
-          <span className="text-stone-500">Activity</span>
-          <span>
-            <span className="font-medium text-rose-300">{daily.high_activity_minutes ?? 0}m</span>{" "}
-            <span className="text-stone-500">high</span>
-          </span>
-          <span>
-            <span className="font-medium text-amber-300">{daily.medium_activity_minutes ?? 0}m</span>{" "}
-            <span className="text-stone-500">med</span>
-          </span>
-          <span>
-            <span className="font-medium text-emerald-300">{daily.low_activity_minutes ?? 0}m</span>{" "}
-            <span className="text-stone-500">low</span>
-          </span>
+        <div className="border-t border-white/[0.06] mt-3 pt-3">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-stone-500 mb-2">
+            Activity Zones
+          </p>
+          <div className="grid grid-cols-3 gap-x-3 gap-y-2">
+            {ACTIVITY_ZONES.map((z) => {
+              const mins = daily[z.field];
+              return (
+                <div key={z.zone} className="flex items-baseline gap-1.5">
+                  <span className="text-[10px] tabular-nums text-stone-600">
+                    {z.zone}
+                  </span>
+                  <span className={`text-sm font-semibold tabular-nums ${z.color}`}>
+                    {mins != null ? fmtMins(mins) : "–"}
+                  </span>
+                  <span className="text-[10px] text-stone-500">{z.label}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
       {workouts.length > 0 && (

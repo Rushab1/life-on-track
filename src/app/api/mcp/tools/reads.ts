@@ -93,7 +93,7 @@ export function registerReadTools(
         client
           .from("oura_daily")
           .select(
-            "sleep_score, readiness_score, activity_score, total_sleep_minutes, sleep_efficiency, avg_hrv, resting_hr, temperature_deviation, steps, active_calories, total_calories, high_activity_minutes, medium_activity_minutes, low_activity_minutes",
+            "sleep_score, readiness_score, activity_score, total_sleep_minutes, sleep_efficiency, avg_hrv, resting_hr, temperature_deviation, steps, active_calories, total_calories, high_activity_minutes, medium_activity_minutes, low_activity_minutes, sedentary_minutes, rest_minutes, non_wear_minutes",
           )
           .eq("user_id", userId)
           .eq("date", date)

@@ -21,9 +21,14 @@ interface DailyActivity extends DailyScore {
   steps?: number | null;
   active_calories?: number | null;
   total_calories?: number | null;
-  high_activity_time?: number | null; // seconds
-  medium_activity_time?: number | null;
-  low_activity_time?: number | null;
+  // Activity-intensity zones, in seconds. Oura buckets the day into 6 classes
+  // (0-5): non-wear, rest, inactive, low, medium, high.
+  high_activity_time?: number | null; // zone 5
+  medium_activity_time?: number | null; // zone 4
+  low_activity_time?: number | null; // zone 3
+  sedentary_time?: number | null; // zone 2 (inactive)
+  resting_time?: number | null; // zone 1
+  non_wear_time?: number | null; // zone 0
 }
 
 interface OuraWorkout {
@@ -133,6 +138,9 @@ export async function syncOuraDaily(
       high_activity_minutes: secToMin(a.high_activity_time),
       medium_activity_minutes: secToMin(a.medium_activity_time),
       low_activity_minutes: secToMin(a.low_activity_time),
+      sedentary_minutes: secToMin(a.sedentary_time),
+      rest_minutes: secToMin(a.resting_time),
+      non_wear_minutes: secToMin(a.non_wear_time),
     });
   }
 
@@ -195,4 +203,40 @@ export async function syncOuraDaily(
   }
 
   return { synced: rows.length };
+}
+
+/**
+ * Backfill oura_tokens.oura_user_id from /personal_info when it's missing, so
+ * incoming webhook events (which carry Oura's user id) can be routed to this
+ * user. Cheap no-op once stored. Best-effort.
+ */
+export async function ensureOuraUserId(
+  client: SupabaseClient,
+  userId: string,
+): Promise<void> {
+  const { data } = await client
+    .from("oura_tokens")
+    .select("oura_user_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!data || data.oura_user_id) return; // not connected, or already known
+
+  const accessToken = await getValidOuraToken(client, userId);
+  if (!accessToken) return;
+
+  const res = await fetch(`${API}/personal_info`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    console.error(`Oura personal_info fetch failed (${res.status})`);
+    return;
+  }
+  const info = (await res.json()) as { id?: string };
+  if (!info.id) return;
+
+  const { error } = await client
+    .from("oura_tokens")
+    .update({ oura_user_id: info.id, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+  if (error) console.error("ensureOuraUserId: update failed", error);
 }

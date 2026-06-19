@@ -2,7 +2,21 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { toDateString, addDays } from "@/lib/dates";
 import { pushToCalendar, pullFromCalendar } from "@/lib/google/calendar";
-import { syncOuraDaily } from "@/lib/oura/client";
+import { syncOuraDaily, ensureOuraUserId } from "@/lib/oura/client";
+import { ensureOuraSubscriptions } from "@/lib/oura/webhooks";
+
+/**
+ * Public base URL of this deployment, used as the Oura webhook callback target.
+ * Configurable via OURA_WEBHOOK_CALLBACK_URL; otherwise derived from Vercel's
+ * production domain env var.
+ */
+function webhookCallbackUrl(): string | null {
+  if (process.env.OURA_WEBHOOK_CALLBACK_URL) {
+    return process.env.OURA_WEBHOOK_CALLBACK_URL;
+  }
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+  return host ? `https://${host}/api/oura/webhook` : null;
+}
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -70,6 +84,8 @@ export async function GET(req: Request): Promise<Response> {
   for (const row of ouraRows ?? []) {
     const userId = row.user_id as string;
     try {
+      // Make sure we can route this user's webhook events, then sync.
+      await ensureOuraUserId(admin, userId);
       await syncOuraDaily(admin, userId, ouraStart, ouraEnd);
       ouraResults.push({ userId, ok: true });
     } catch (err) {
@@ -81,11 +97,32 @@ export async function GET(req: Request): Promise<Response> {
     }
   }
 
+  // Keep the app-level webhook subscriptions alive (create missing, renew
+  // before expiry) so Oura keeps pushing updates between cron runs.
+  let ouraWebhooks: Awaited<ReturnType<typeof ensureOuraSubscriptions>> | null =
+    null;
+  const callbackUrl = webhookCallbackUrl();
+  if (callbackUrl) {
+    try {
+      ouraWebhooks = await ensureOuraSubscriptions(admin, callbackUrl);
+    } catch (err) {
+      console.error("google-sync cron: webhook subscription sync failed", err);
+    }
+  } else {
+    console.warn(
+      "google-sync cron: no webhook callback URL configured; skipping Oura subscriptions",
+    );
+  }
+
   return NextResponse.json({
     ran: results.length,
     startDate,
     endDate,
     results,
-    oura: { ran: ouraResults.length, results: ouraResults },
+    oura: {
+      ran: ouraResults.length,
+      results: ouraResults,
+      webhooks: ouraWebhooks,
+    },
   });
 }
