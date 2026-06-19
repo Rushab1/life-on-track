@@ -198,3 +198,23 @@ export async function ensureOuraSubscriptions(
 
 /** Map an Oura webhook data_type to whether it lands in our oura_daily mirror. */
 export const WEBHOOK_DATA_TYPES = DATA_TYPES;
+
+/**
+ * Cheap local check (no Oura API call): are all expected subscriptions present
+ * and not expiring within a week? Lets hot paths like app-open sync skip the
+ * remote ensure call in the common case.
+ */
+export async function subscriptionsHealthy(
+  client: SupabaseClient,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from("oura_webhook_subscriptions")
+    .select("expiration_time");
+  if (error || !data) return false;
+  if (data.length < DATA_TYPES.length * EVENT_TYPES.length) return false;
+  const soon = Date.now() + 7 * 24 * 60 * 60 * 1000;
+  return data.every(
+    (r) =>
+      r.expiration_time && new Date(r.expiration_time as string).getTime() > soon,
+  );
+}
