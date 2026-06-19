@@ -6,12 +6,13 @@ const OURA_CLIENT_ID = process.env.OURA_CLIENT_ID;
 const OURA_CLIENT_SECRET = process.env.OURA_CLIENT_SECRET;
 
 /**
- * Shared secret echoed back during the subscription verification handshake.
- * Falls back to the client secret so the integration works even if the
- * dedicated var isn't set, but a distinct value is preferred.
+ * Secret that authenticates Oura's calls to our webhook endpoint. It's both
+ * the verification-handshake token AND embedded in the registered callback URL
+ * (?token=...), so every event POST carries it — that's how we reject forged
+ * requests in a multi-user setup. Must be set explicitly; we deliberately do
+ * NOT fall back to the client secret (it would end up in a URL).
  */
-export const OURA_WEBHOOK_TOKEN =
-  process.env.OURA_WEBHOOK_TOKEN ?? OURA_CLIENT_SECRET ?? "";
+export const OURA_WEBHOOK_TOKEN = process.env.OURA_WEBHOOK_TOKEN ?? "";
 
 // Data types we mirror today. Each gets create + update subscriptions so we're
 // notified both when a day first appears and when Oura revises it overnight.
@@ -93,6 +94,24 @@ async function renewSubscription(id: string): Promise<OuraSubscription | null> {
   return (await res.json()) as OuraSubscription;
 }
 
+async function deleteSubscription(client: SupabaseClient, id: string): Promise<void> {
+  const res = await fetch(`${WEBHOOK_API}/${id}`, {
+    method: "DELETE",
+    headers: headers(),
+  });
+  if (!res.ok && res.status !== 404) {
+    console.error(`Oura webhook delete failed for ${id} (${res.status})`);
+  }
+  await client.from("oura_webhook_subscriptions").delete().eq("id", id);
+}
+
+/** Append the auth token to the callback URL as a query param. */
+function withToken(callbackUrl: string): string {
+  const u = new URL(callbackUrl);
+  u.searchParams.set("token", OURA_WEBHOOK_TOKEN);
+  return u.toString();
+}
+
 async function persist(
   client: SupabaseClient,
   sub: OuraSubscription,
@@ -125,6 +144,7 @@ export async function ensureOuraSubscriptions(
     return { created: 0, renewed: 0, total: 0 };
   }
 
+  const callbackWithToken = withToken(callbackUrl);
   const existing = await listSubscriptions();
   const byKey = new Map(
     existing.map((s) => [`${s.event_type}:${s.data_type}`, s]),
@@ -136,9 +156,17 @@ export async function ensureOuraSubscriptions(
 
   for (const dataType of DATA_TYPES) {
     for (const eventType of EVENT_TYPES) {
-      const found = byKey.get(`${eventType}:${dataType}`);
+      let found = byKey.get(`${eventType}:${dataType}`);
+
+      // If an existing subscription points somewhere else (e.g. an old URL or
+      // a rotated token), drop it so we recreate it with the current callback.
+      if (found && found.callback_url !== callbackWithToken) {
+        await deleteSubscription(client, found.id);
+        found = undefined;
+      }
+
       if (!found) {
-        const sub = await createSubscription(callbackUrl, eventType, dataType);
+        const sub = await createSubscription(callbackWithToken, eventType, dataType);
         if (sub) {
           await persist(client, sub);
           created++;

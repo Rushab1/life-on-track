@@ -23,6 +23,15 @@ export async function GET(req: Request): Promise<Response> {
   return NextResponse.json({ challenge });
 }
 
+/** Constant-time check that the request carries our callback-URL secret. */
+function tokenValid(req: Request): boolean {
+  if (!OURA_WEBHOOK_TOKEN) return false;
+  const token = new URL(req.url).searchParams.get("token") ?? "";
+  const a = Buffer.from(token);
+  const b = Buffer.from(OURA_WEBHOOK_TOKEN);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 /** Best-effort HMAC check — logs on mismatch but doesn't reject (see POST). */
 function signatureLooksValid(
   rawBody: string,
@@ -53,12 +62,17 @@ interface WebhookEvent {
 }
 
 /**
- * Receive a webhook event. Oura POSTs ~30s after a phone sync. We treat the
- * payload only as a hint: map the Oura user_id to our user and re-pull the
- * recent window from Oura's authenticated API (we never trust body data),
- * so a forged POST can at worst trigger a harmless re-sync for a known user.
+ * Receive a webhook event. Oura POSTs ~30s after a phone sync, to the exact
+ * callback URL we registered — which embeds ?token=OURA_WEBHOOK_TOKEN — so the
+ * token gates forged requests. Beyond that we treat the payload only as a
+ * hint: map the Oura user_id to our user and re-pull the recent window from
+ * Oura's authenticated API (we never trust body data).
  */
 export async function POST(req: Request): Promise<Response> {
+  if (!tokenValid(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
   const rawBody = await req.text();
 
   if (
