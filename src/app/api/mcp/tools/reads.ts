@@ -9,6 +9,7 @@ import type {
   Plan,
   WorkoutSet,
 } from "@/lib/types";
+import { syncOuraIfStale } from "@/lib/oura/client";
 import { dateSchema, safeErrorMessage } from "../validation";
 
 /**
@@ -29,6 +30,12 @@ export function registerReadTools(
     'Get everything for a single date in one call: pain level, notes, active plan (with exercise templates), any day override, scheduled + ad-hoc activities, workout sets grouped by exercise, widget values, life events, Google Calendar events, and Oura Ring metrics (sleep/readiness/activity scores, HRV, resting HR, steps). This is the canonical starting tool — call it first when the user asks about a day. WORKOUT LOGGING PROTOCOL — call this FIRST. After showing notes + plan, collect a baseline pain panel (multiple-choice body parts drawn from the last 7 days of logs and today\'s notes) BEFORE any sets are discussed, and persist it with save_day. Then follow the per-set protocol described on log_workout. Follow the workout-logging prompt for the full session protocol.',
     { date: dateSchema.describe("Date in YYYY-MM-DD format") },
     async ({ date }) => {
+      // Self-sufficient Oura: pull fresh data on demand so the MCP doesn't
+      // depend on the website (or a webhook) having synced first. Best-effort.
+      await syncOuraIfStale(client, userId, date).catch((err) =>
+        console.error("get_day: oura on-demand sync failed", err),
+      );
+
       const [
         dailyLogRes,
         activitiesRes,

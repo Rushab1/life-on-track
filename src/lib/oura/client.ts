@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getValidOuraToken } from "./tokens";
+import { toDateString, addDays } from "@/lib/dates";
 
 const API = "https://api.ouraring.com/v2/usercollection";
 
@@ -203,6 +204,44 @@ export async function syncOuraDaily(
   }
 
   return { synced: rows.length };
+}
+
+/**
+ * Pull fresh Oura data for `date` on demand when the local mirror is stale or
+ * missing — used by the MCP read path so it never depends on the website (or a
+ * webhook) having synced first. Cheap and best-effort:
+ *   - skips future dates and, for rows that already exist, stable history (>3d);
+ *   - skips when the existing row was synced within `maxAgeMinutes`;
+ *   - no-ops when the user isn't connected (getValidOuraToken returns null).
+ * Syncs only the single requested day to keep latency/API usage low.
+ */
+export async function syncOuraIfStale(
+  client: SupabaseClient,
+  userId: string,
+  date: string,
+  maxAgeMinutes = 15,
+): Promise<void> {
+  const now = new Date();
+  if (date > toDateString(addDays(now, 1))) return; // future day, nothing yet
+
+  const ageDays = (Date.parse(toDateString(now)) - Date.parse(date)) / 86_400_000;
+
+  const { data } = await client
+    .from("oura_daily")
+    .select("last_synced_at")
+    .eq("user_id", userId)
+    .eq("date", date)
+    .maybeSingle();
+
+  if (data?.last_synced_at) {
+    if (ageDays > 3) return; // historical row already present and stable
+    const age = Date.now() - new Date(data.last_synced_at as string).getTime();
+    if (age < maxAgeMinutes * 60 * 1000) return; // fresh enough
+  } else if (ageDays > 60) {
+    return; // no row and too old to be worth a backfill
+  }
+
+  await syncOuraDaily(client, userId, date, toDateString(addDays(new Date(date), 1)));
 }
 
 /**
