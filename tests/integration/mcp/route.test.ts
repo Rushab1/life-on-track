@@ -144,6 +144,10 @@ afterAll(async () => {
     adminClient.from("daily_logs").delete().eq("user_id", userIdB),
     adminClient.from("life_events").delete().eq("user_id", userIdA),
     adminClient.from("life_events").delete().eq("user_id", userIdB),
+    adminClient.from("activity_completions").delete().eq("user_id", userIdA),
+    adminClient.from("activity_completions").delete().eq("user_id", userIdB),
+    adminClient.from("plans").delete().eq("user_id", userIdA),
+    adminClient.from("plans").delete().eq("user_id", userIdB),
   ]);
   await Promise.all([deleteTestUser(userIdA), deleteTestUser(userIdB)]);
 }, 15_000);
@@ -296,6 +300,66 @@ describe("/api/mcp life events", () => {
     const result = (body as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
     const text = result?.content?.[0]?.text ?? "";
     expect(text).not.toContain("User B secret trip");
+  });
+});
+
+describe("/api/mcp plan-defined activity codes", () => {
+  // Regression: a non-PPL plan (Upper/Lower) introduces gym types like "up2".
+  // get_day schedules them, but save_day used to reject them because the
+  // validator only knew the hardcoded legacy codes.
+  const PLAN_DATE = "2026-06-25";
+
+  beforeAll(async () => {
+    const allDaysUp2: Record<string, string> = {
+      "0": "up2",
+      "1": "up2",
+      "2": "up2",
+      "3": "up2",
+      "4": "up2",
+      "5": "up2",
+      "6": "up2",
+    };
+    const { error } = await adminClient.from("plans").insert({
+      user_id: userIdA,
+      name: "Upper/Lower test plan",
+      start_date: "2026-01-01",
+      end_date: "2026-12-31",
+      gym_schedule: allDaysUp2,
+      prep_schedule: {},
+      workout_templates: { up2: ["Overhead Press"] },
+      workout_meta: {},
+    });
+    if (error) throw new Error(`plan seed failed: ${error.message}`);
+  }, 15_000);
+
+  it("get_day surfaces the plan's gym type 'up2'", async () => {
+    const { body } = await mcpToolCall(mcpTokenA, "get_day", { date: PLAN_DATE });
+    const result = (body as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
+    const parsed = JSON.parse(result?.content?.[0]?.text ?? "{}");
+    expect(
+      parsed.activities.some((a: { code: string }) => a.code === "up2"),
+    ).toBe(true);
+  });
+
+  it("save_day accepts 'up2' and flips the completion to true", async () => {
+    const { body } = await mcpToolCall(mcpTokenA, "save_day", {
+      date: PLAN_DATE,
+      activities: [{ code: "up2", completed: true }],
+    });
+    const result = (body as Record<string, unknown>).result as { content?: { text?: string }[] } | undefined;
+    const text = result?.content?.[0]?.text ?? "";
+    expect(text).not.toContain("validation failed");
+    expect(text).toContain("Activities");
+
+    // Verify the persisted row.
+    const { data } = await adminClient
+      .from("activity_completions")
+      .select("completed")
+      .eq("user_id", userIdA)
+      .eq("date", PLAN_DATE)
+      .eq("activity_type", "up2")
+      .maybeSingle();
+    expect(data?.completed).toBe(true);
   });
 });
 

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Plan } from "@/lib/types";
+import { getActivitiesForDate } from "@/config/schedule";
 import { dateSchema, safeErrorMessage } from "../validation";
 import { getKnownActivities, validateActivity } from "./activity-helpers";
 
@@ -135,6 +137,36 @@ export function registerSaveDayTool(
       // 3) Activity updates
       if (activities && activities.length > 0) {
         const known = await getKnownActivities(client, userId);
+
+        // Defensive: accept any code get_day surfaced as scheduled for this
+        // date (plan gym type + prep, honoring a day override), even if it's
+        // not otherwise in the catalog — what's readable must be writable.
+        const [planRes, overrideRes] = await Promise.all([
+          client
+            .from("plans")
+            .select("gym_schedule, prep_schedule")
+            .eq("user_id", userId)
+            .lte("start_date", date)
+            .gte("end_date", date)
+            .limit(1)
+            .maybeSingle(),
+          client
+            .from("day_overrides")
+            .select("gym_type")
+            .eq("user_id", userId)
+            .eq("date", date)
+            .maybeSingle(),
+        ]);
+        const overrideGym =
+          (overrideRes.data as { gym_type: string } | null)?.gym_type ?? null;
+        const scheduled = getActivitiesForDate(
+          new Date(date + "T00:00:00"),
+          (planRes.data as unknown as Plan | null) ?? null,
+          overrideGym,
+        );
+        for (const code of scheduled) {
+          if (!known[code]) known[code] = code;
+        }
 
         // Validate every code up-front — all-or-nothing
         const resolved: { code: string; orig: (typeof activities)[number] }[] = [];
