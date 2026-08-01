@@ -10,7 +10,81 @@ import type {
   WorkoutSet,
 } from "@/lib/types";
 import { syncOuraIfStale } from "@/lib/oura/client";
+import { addDays, toDateString } from "@/lib/dates";
 import { dateSchema, safeErrorMessage } from "../validation";
+import {
+  computeAggregate,
+  computeDayRows,
+  enumerateDates,
+  type DayRow,
+} from "./history-helpers";
+
+/**
+ * Fetch and assemble per-day history rows for an inclusive date range. Backs
+ * get_history's per-day (Mode A) and recent-days (Mode C) paths. Every table
+ * is scoped to the range so one round-trip each covers the whole span.
+ */
+async function fetchDayRows(
+  client: SupabaseClient,
+  userId: string,
+  startDate: string,
+  endDate: string,
+): Promise<{ rows: DayRow[]; error: { message: string; code?: string } | null }> {
+  const dates = enumerateDates(startDate, endDate);
+  if (dates.length === 0) return { rows: [], error: null };
+
+  const [logsRes, actsRes, wsRes, plansRes, overridesRes] = await Promise.all([
+    client
+      .from("daily_logs")
+      .select("*")
+      .eq("user_id", userId)
+      .gte("date", startDate)
+      .lte("date", endDate),
+    client
+      .from("activity_completions")
+      .select("*")
+      .eq("user_id", userId)
+      .gte("date", startDate)
+      .lte("date", endDate),
+    client
+      .from("workout_sets")
+      .select("*")
+      .eq("user_id", userId)
+      .gte("date", startDate)
+      .lte("date", endDate)
+      .order("created_at", { ascending: true }),
+    client
+      .from("plans")
+      .select("*")
+      .eq("user_id", userId)
+      .lte("start_date", endDate)
+      .gte("end_date", startDate),
+    client
+      .from("day_overrides")
+      .select("date, gym_type")
+      .eq("user_id", userId)
+      .gte("date", startDate)
+      .lte("date", endDate),
+  ]);
+
+  const error =
+    logsRes.error ??
+    actsRes.error ??
+    wsRes.error ??
+    plansRes.error ??
+    overridesRes.error ??
+    null;
+  if (error) return { rows: [], error };
+
+  const rows = computeDayRows(dates, {
+    dailyLogs: (logsRes.data ?? []) as DailyLog[],
+    activities: (actsRes.data ?? []) as ActivityCompletion[],
+    workouts: (wsRes.data ?? []) as WorkoutSet[],
+    plans: (plansRes.data ?? []) as Plan[],
+    overrides: (overridesRes.data ?? []) as { date: string; gym_type: string }[],
+  });
+  return { rows, error: null };
+}
 
 /**
  * get_day — the one-stop read for a single date. Merges the old
@@ -265,14 +339,31 @@ export function registerReadTools(
 
   server.tool(
     "get_history",
-    "Get history across a date range or recent sessions per exercise. Mode A (range summary): provide start_date and/or end_date (default: last 7 days) — returns avg pain, activity completion rates, workout days, and total exercises. Mode B (progressive overload): provide exercises (and optionally before_date, default today) — returns the most recent sessions per exercise before that date. Use `sessions` to control how many recent sessions per exercise are returned (default 3). PROTOCOL: use Mode B (per-exercise recent sessions) BEFORE offering set options, so options reflect the user's actual prior numbers. Also use at session end to compare today's cardio/HR-zone work against the most recent session of the same activity. Follow the workout-logging prompt for the full session protocol.",
+    "Get history across a date range, a count of recent days, or recent sessions per exercise. Mode A (range summary): provide start_date and/or end_date (default: last 7 days) — returns avg pain, activity completion rates, workout days, and total exercises; add per_day:true to also get a day-by-day breakdown (each day's plan code, pain, notes, activities, and per-exercise set summary, max 92 days). Mode B (progressive overload / recent instances): provide exercises (and optionally before_date, default today) — returns the most recent sessions per exercise before that date; pass a single exercise name to get just its recent N instances. Use `sessions` to control how many recent sessions per exercise are returned (default 3). Mode C (recent N days): provide recent_days:N — returns the last N calendar days (ending today or at end_date), newest first, each with its plan code, pain, notes, activities, and workout summary. PROTOCOL: use Mode B (per-exercise recent sessions) BEFORE offering set options, so options reflect the user's actual prior numbers. Also use at session end to compare today's cardio/HR-zone work against the most recent session of the same activity. Follow the workout-logging prompt for the full session protocol.",
     {
       start_date: dateSchema
         .optional()
         .describe("Range start YYYY-MM-DD (Mode A). Defaults to 7 days ago."),
       end_date: dateSchema
         .optional()
-        .describe("Range end YYYY-MM-DD (Mode A). Defaults to today."),
+        .describe(
+          "Range end YYYY-MM-DD (Mode A). Also the anchor date for recent_days (Mode C). Defaults to today.",
+        ),
+      per_day: z
+        .boolean()
+        .optional()
+        .describe(
+          "Mode A: also return a day-by-day breakdown (each day's plan code, pain, notes, activities, and per-exercise set summary). Range capped at 92 days.",
+        ),
+      recent_days: z
+        .number()
+        .int()
+        .min(1)
+        .max(90)
+        .optional()
+        .describe(
+          "Mode C: return the last N calendar days (ending today or at end_date), newest first, each with its plan code and day summary.",
+        ),
       exercises: z
         .array(z.string().max(200))
         .max(50)
@@ -291,8 +382,16 @@ export function registerReadTools(
           "Mode B: number of most recent sessions (distinct dates) to return per exercise. Defaults to 3.",
         ),
     },
-    async ({ start_date, end_date, exercises, before_date, sessions }) => {
-      // Mode B: progressive overload lookup
+    async ({
+      start_date,
+      end_date,
+      per_day,
+      recent_days,
+      exercises,
+      before_date,
+      sessions,
+    }) => {
+      // Mode B: progressive overload lookup (recent instances per exercise)
       if (exercises && exercises.length > 0) {
         const cutoff =
           before_date ?? new Date().toISOString().split("T")[0];
@@ -356,7 +455,39 @@ export function registerReadTools(
         };
       }
 
-      // Mode A: aggregated range summary
+      // Mode C: recent N calendar days, each tagged with its plan code
+      if (recent_days && recent_days > 0) {
+        const anchor = end_date ?? new Date().toISOString().split("T")[0];
+        const startD = toDateString(
+          addDays(new Date(anchor + "T00:00:00"), -(recent_days - 1)),
+        );
+        const { rows, error } = await fetchDayRows(
+          client,
+          userId,
+          startD,
+          anchor,
+        );
+        if (error) {
+          return {
+            content: [{ type: "text" as const, text: safeErrorMessage(error) }],
+          };
+        }
+        rows.reverse(); // newest first — "recent" reads best most-recent-first
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(
+                { range: { start: startD, end: anchor }, count: rows.length, days: rows },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
+
+      // Mode A: aggregated range summary (+ optional per-day breakdown)
       const endDate = end_date ?? new Date().toISOString().split("T")[0];
       const startDate =
         start_date ??
@@ -382,61 +513,74 @@ export function registerReadTools(
           .eq("user_id", userId)
           .gte("date", startDate)
           .lte("date", endDate)
-          .order("date"),
+          .order("created_at", { ascending: true }),
       ]);
 
       const dailyLogs = (dailyLogsRes.data ?? []) as DailyLog[];
       const activities = (activitiesRes.data ?? []) as ActivityCompletion[];
       const workouts = (workoutsRes.data ?? []) as WorkoutSet[];
 
-      const painValues = dailyLogs
-        .filter((d) => d.pain_level !== null)
-        .map((d) => d.pain_level!);
-      const avgPain =
-        painValues.length > 0
-          ? Math.round(
-              (painValues.reduce((a, b) => a + b, 0) / painValues.length) * 10,
-            ) / 10
-          : null;
+      const aggregate = computeAggregate(
+        dailyLogs,
+        activities,
+        workouts,
+        startDate,
+        endDate,
+      );
 
-      const activityCounts: Record<
-        string,
-        { completed: number; total: number }
-      > = {};
-      for (const a of activities) {
-        if (!activityCounts[a.activity_type]) {
-          activityCounts[a.activity_type] = { completed: 0, total: 0 };
-        }
-        activityCounts[a.activity_type].total++;
-        if (a.completed) activityCounts[a.activity_type].completed++;
+      if (!per_day) {
+        return {
+          content: [
+            { type: "text" as const, text: JSON.stringify(aggregate, null, 2) },
+          ],
+        };
       }
 
-      const activityRates = Object.entries(activityCounts).map(
-        ([type, counts]) => ({
-          activity: type,
-          label: ACTIVITY_LABELS[type] ?? type,
-          completed: counts.completed,
-          total: counts.total,
-          rate: `${Math.round((counts.completed / counts.total) * 100)}%`,
-        }),
-      );
+      // per_day: bound the span first, then reuse the range fetch above plus a
+      // plans + overrides lookup to attach each day's plan code and summary.
+      const dates = enumerateDates(startDate, endDate);
+      if (dates.length > 92) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Per-day mode is limited to 92 days. Narrow the range, or omit per_day for an aggregate summary.",
+            },
+          ],
+        };
+      }
+
+      const [plansRes, overridesRes] = await Promise.all([
+        client
+          .from("plans")
+          .select("*")
+          .eq("user_id", userId)
+          .lte("start_date", endDate)
+          .gte("end_date", startDate),
+        client
+          .from("day_overrides")
+          .select("date, gym_type")
+          .eq("user_id", userId)
+          .gte("date", startDate)
+          .lte("date", endDate),
+      ]);
+
+      const days = computeDayRows(dates, {
+        dailyLogs,
+        activities,
+        workouts,
+        plans: (plansRes.data ?? []) as Plan[],
+        overrides: (overridesRes.data ?? []) as {
+          date: string;
+          gym_type: string;
+        }[],
+      });
 
       return {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify(
-              {
-                range: { start: startDate, end: endDate },
-                days_logged: dailyLogs.length,
-                avg_pain_level: avgPain,
-                activity_completion: activityRates,
-                workout_days: new Set(workouts.map((w) => w.date)).size,
-                total_exercises_logged: workouts.length,
-              },
-              null,
-              2,
-            ),
+            text: JSON.stringify({ ...aggregate, days }, null, 2),
           },
         ],
       };

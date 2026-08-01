@@ -58,6 +58,17 @@ describe("MCP workout logging protocol", () => {
     expect(d).toContain("cardio/HR-zone");
   });
 
+  it("get_history documents the per-day, recent-days, and recent-instances modes", () => {
+    const d = descriptions.get_history;
+    // Feature: range of days together (per-day breakdown).
+    expect(d).toContain("per_day");
+    // Feature: recent N days with plan code.
+    expect(d).toContain("recent_days");
+    expect(d).toContain("plan code");
+    // Feature: recent N instances of a given exercise (single-exercise Mode B).
+    expect(d).toContain("recent N instances");
+  });
+
   it("save_day carries the phased-notes protocol", () => {
     const d = descriptions.save_day;
     expect(d).toContain(

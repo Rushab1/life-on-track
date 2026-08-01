@@ -363,6 +363,128 @@ describe("/api/mcp plan-defined activity codes", () => {
   });
 });
 
+describe("/api/mcp get_history per-day, recent-days, and recent-instances modes", () => {
+  // Self-contained March 2026 window so these rows never collide with the
+  // other suites (which use Jan/Jun dates).
+  const PLAN_START = "2026-03-01";
+  const PLAN_END = "2026-03-31";
+  const D1 = "2026-03-10";
+  const D2 = "2026-03-11";
+
+  beforeAll(async () => {
+    const { error: planErr } = await adminClient.from("plans").insert({
+      user_id: userIdA,
+      name: "History modes test plan",
+      start_date: PLAN_START,
+      end_date: PLAN_END,
+      gym_schedule: {
+        "0": "rst",
+        "1": "psh",
+        "2": "pll",
+        "3": "lgh",
+        "4": "lgl",
+        "5": "yga",
+        "6": "rst",
+      },
+      prep_schedule: {},
+      workout_templates: {},
+      workout_meta: {},
+    });
+    if (planErr) throw new Error(`plan seed failed: ${planErr.message}`);
+
+    const { error: setErr } = await adminClient.from("workout_sets").insert([
+      { user_id: userIdA, date: D1, exercise: "Bench Press", reps: 5, weight_lbs: 135 },
+      { user_id: userIdA, date: D1, exercise: "Bench Press", reps: 5, weight_lbs: 145 },
+    ]);
+    if (setErr) throw new Error(`set seed failed: ${setErr.message}`);
+
+    const { error: logErr } = await adminClient
+      .from("daily_logs")
+      .insert({ user_id: userIdA, date: D1, pain_level: 2, notes: "history-mode-note" });
+    if (logErr) throw new Error(`log seed failed: ${logErr.message}`);
+  }, 15_000);
+
+  afterAll(async () => {
+    await Promise.all([
+      adminClient
+        .from("workout_sets")
+        .delete()
+        .eq("user_id", userIdA)
+        .gte("date", PLAN_START)
+        .lte("date", PLAN_END),
+      adminClient.from("plans").delete().eq("user_id", userIdA).eq("start_date", PLAN_START),
+      adminClient.from("daily_logs").delete().eq("user_id", userIdA).eq("date", D1),
+    ]);
+  }, 15_000);
+
+  function parseHistory(body: unknown): Record<string, unknown> {
+    const result = (body as Record<string, unknown>).result as
+      | { content?: { text?: string }[] }
+      | undefined;
+    return JSON.parse(result?.content?.[0]?.text ?? "{}");
+  }
+
+  it("per_day returns a day-by-day breakdown with plan codes (Feature 1)", async () => {
+    const { body } = await mcpToolCall(mcpTokenA, "get_history", {
+      start_date: D1,
+      end_date: D2,
+      per_day: true,
+    });
+    const parsed = parseHistory(body);
+    const days = parsed.days as Record<string, unknown>[];
+    expect(Array.isArray(days)).toBe(true);
+    expect(days).toHaveLength(2);
+
+    const d1 = days.find((d) => d.date === D1)!;
+    expect(typeof d1.plan_code).toBe("string");
+    expect(d1.pain_level).toBe(2);
+    const workouts = d1.workouts as Record<string, unknown>[];
+    expect(workouts[0].exercise).toBe("Bench Press");
+    expect(workouts[0].sets).toBe(2);
+    expect(workouts[0].top_weight_lbs).toBe(145);
+
+    // Aggregate fields still come along for the ride.
+    expect(parsed.total_exercises_logged as number).toBeGreaterThanOrEqual(2);
+  });
+
+  it("recent_days returns the last N days newest-first with plan codes (Feature 2)", async () => {
+    const { body } = await mcpToolCall(mcpTokenA, "get_history", {
+      recent_days: 3,
+      end_date: D2,
+    });
+    const parsed = parseHistory(body);
+    expect(parsed.count).toBe(3);
+    const days = parsed.days as Record<string, unknown>[];
+    expect(days[0].date).toBe(D2); // newest first
+    expect(days.every((d) => typeof d.plan_code === "string")).toBe(true);
+  });
+
+  it("a single exercise (Mode B) returns its recent instances (Feature 3)", async () => {
+    const { body } = await mcpToolCall(mcpTokenA, "get_history", {
+      exercises: ["Bench Press"],
+      sessions: 2,
+      before_date: D2,
+    });
+    const parsed = parseHistory(body);
+    const instances = parsed["Bench Press"] as Record<string, unknown>[];
+    expect(Array.isArray(instances)).toBe(true);
+    expect(instances.length).toBeGreaterThanOrEqual(2);
+    expect(instances.every((s) => s.date === D1)).toBe(true);
+  });
+
+  it("per_day rejects an oversized range", async () => {
+    const { body } = await mcpToolCall(mcpTokenA, "get_history", {
+      start_date: "2026-01-01",
+      end_date: "2026-12-31",
+      per_day: true,
+    });
+    const result = (body as Record<string, unknown>).result as
+      | { content?: { text?: string }[] }
+      | undefined;
+    expect(result?.content?.[0]?.text ?? "").toContain("limited to 92 days");
+  });
+});
+
 describe("/api/mcp Cache-Control headers", () => {
   it("sets no-store on auth error responses", async () => {
     const res = await callMcpRoute(null, "get_day", { date: "2026-01-01" });
