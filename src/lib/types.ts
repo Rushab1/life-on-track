@@ -79,7 +79,7 @@ export interface WidgetDefinition {
   name: string;
   type: "slider" | "counter" | "boolean" | "text" | "select";
   config: Record<string, unknown>;
-  scope: "daily" | "activity" | "global";
+  scope: "daily" | "activity" | "global" | "sites";
   activity_filter: string[] | null;
   preset: boolean;
   sort_order: number;

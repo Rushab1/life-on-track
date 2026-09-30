@@ -6,8 +6,10 @@ import {
   enumerateDates,
   planForDate,
   summarizeWorkouts,
+  toDayWidgetValue,
   weekdayLabel,
 } from "@/app/api/mcp/tools/history-helpers";
+import type { WidgetValueRow } from "@/app/api/mcp/tools/history-helpers";
 import type {
   ActivityCompletion,
   DailyLog,
@@ -62,6 +64,22 @@ function set(
     notes: null,
     created_at: `${date}T00:00:00Z`,
     ...fields,
+  };
+}
+
+function widgetValue(
+  date: string,
+  name: string,
+  scope: string,
+  subject: string | null,
+  value: unknown,
+): WidgetValueRow {
+  return {
+    widget_id: `w-${name}`,
+    date,
+    activity_type: subject,
+    value,
+    widget_definitions: { name, scope },
   };
 }
 
@@ -242,6 +260,37 @@ describe("buildDayRow", () => {
     expect(row.workouts).toEqual([]);
   });
 
+  it("carries the day's widget values, one entry per site", () => {
+    const row = buildDayRow("2026-01-05", {
+      dailyLog: null,
+      completions: [],
+      workoutSets: [],
+      plan: PLAN,
+      override: null,
+      widgetValues: [
+        widgetValue("2026-01-05", "Pain", "sites", "kneecap", 4),
+        widgetValue("2026-01-05", "Pain", "sites", "ankle", 1),
+        widgetValue("2026-01-05", "Mood", "daily", null, 3),
+      ],
+    });
+    expect(row.widget_values).toEqual([
+      { widget_id: "w-Pain", widget_name: "Pain", scope: "sites", subject: "kneecap", value: 4 },
+      { widget_id: "w-Pain", widget_name: "Pain", scope: "sites", subject: "ankle", value: 1 },
+      { widget_id: "w-Mood", widget_name: "Mood", scope: "daily", subject: null, value: 3 },
+    ]);
+  });
+
+  it("defaults widget values to an empty list", () => {
+    const row = buildDayRow("2026-01-05", {
+      dailyLog: null,
+      completions: [],
+      workoutSets: [],
+      plan: PLAN,
+      override: null,
+    });
+    expect(row.widget_values).toEqual([]);
+  });
+
   it("falls back to rst with no plan", () => {
     const row = buildDayRow("2026-01-05", {
       dailyLog: null,
@@ -268,12 +317,19 @@ describe("computeDayRows", () => {
       ],
       plans: [PLAN],
       overrides: [{ date: "2026-01-06", gym_type: "yga" }],
+      widgetValues: [
+        widgetValue("2026-01-05", "Pain", "sites", "kneecap", 4),
+        widgetValue("2026-01-07", "Pain", "sites", "ankle", 2),
+      ],
     });
 
     expect(rows).toHaveLength(3);
     expect(rows[0].date).toBe("2026-01-05");
     expect(rows[0].pain_level).toBe(2);
     expect(rows[0].workouts[0].exercise).toBe("Bench");
+    expect(rows[0].widget_values).toEqual([
+      { widget_id: "w-Pain", widget_name: "Pain", scope: "sites", subject: "kneecap", value: 4 },
+    ]);
 
     // Middle day has no log/workout but still appears, with its override.
     expect(rows[1].date).toBe("2026-01-06");
@@ -281,10 +337,33 @@ describe("computeDayRows", () => {
     expect(rows[1].is_override).toBe(true);
     expect(rows[1].pain_level).toBeNull();
     expect(rows[1].workouts).toEqual([]);
+    expect(rows[1].widget_values).toEqual([]);
 
     expect(rows[2].date).toBe("2026-01-07");
     expect(rows[2].pain_level).toBe(6);
     expect(rows[2].workouts[0].exercise).toBe("Squat");
+    expect(rows[2].widget_values.map((v) => v.subject)).toEqual(["ankle"]);
+  });
+});
+
+// --- toDayWidgetValue ------------------------------------------------------
+
+describe("toDayWidgetValue", () => {
+  it("falls back when the definition join is missing", () => {
+    expect(
+      toDayWidgetValue({
+        widget_id: "w-1",
+        date: "2026-01-05",
+        activity_type: null,
+        value: 2,
+      }),
+    ).toEqual({
+      widget_id: "w-1",
+      widget_name: "Unknown",
+      scope: "daily",
+      subject: null,
+      value: 2,
+    });
   });
 });
 

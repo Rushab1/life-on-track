@@ -99,6 +99,39 @@ export function summarizeWorkouts(sets: WorkoutSet[]): DayWorkoutSummary[] {
   return order.map((e) => byExercise[e]);
 }
 
+/**
+ * A widget_values row as fetched for a range, with its definition joined. The
+ * activity_type column doubles as the site for sites-scoped widgets, so the
+ * joined scope is what makes the string readable.
+ */
+export interface WidgetValueRow {
+  widget_id: string;
+  date: string;
+  activity_type: string | null;
+  value: unknown;
+  widget_definitions?: { name?: string | null; scope?: string | null } | null;
+}
+
+export interface DayWidgetValue {
+  widget_id: string;
+  widget_name: string;
+  scope: string;
+  /** Site for scope=sites, activity code for scope=activity, else null. */
+  subject: string | null;
+  value: unknown;
+}
+
+/** Flatten one fetched widget_values row into its day-row shape. */
+export function toDayWidgetValue(row: WidgetValueRow): DayWidgetValue {
+  return {
+    widget_id: row.widget_id,
+    widget_name: row.widget_definitions?.name ?? "Unknown",
+    scope: row.widget_definitions?.scope ?? "daily",
+    subject: row.activity_type ?? null,
+    value: row.value,
+  };
+}
+
 export interface DayRow {
   date: string;
   weekday: string;
@@ -115,6 +148,8 @@ export interface DayRow {
   };
   workouts: DayWorkoutSummary[];
   total_sets: number;
+  /** Logged widget values for the day, including one row per body site. */
+  widget_values: DayWidgetValue[];
 }
 
 /** Build a single day's history row from its already-fetched pieces. Pure. */
@@ -126,6 +161,7 @@ export function buildDayRow(
     workoutSets: WorkoutSet[];
     plan: Plan | null;
     override: string | null;
+    widgetValues?: WidgetValueRow[];
   },
 ): DayRow {
   const { dailyLog, completions, workoutSets, plan, override } = parts;
@@ -146,6 +182,7 @@ export function buildDayRow(
     },
     workouts: summarizeWorkouts(workoutSets),
     total_sets: workoutSets.length,
+    widget_values: (parts.widgetValues ?? []).map(toDayWidgetValue),
   };
 }
 
@@ -162,6 +199,7 @@ export function computeDayRows(
     workouts: WorkoutSet[];
     plans: Plan[];
     overrides: { date: string; gym_type: string }[];
+    widgetValues?: WidgetValueRow[];
   },
 ): DayRow[] {
   const logByDate: Record<string, DailyLog> = {};
@@ -176,6 +214,9 @@ export function computeDayRows(
   const overrideByDate: Record<string, string> = {};
   for (const o of data.overrides) overrideByDate[o.date] = o.gym_type;
 
+  const wvByDate: Record<string, WidgetValueRow[]> = {};
+  for (const v of data.widgetValues ?? []) (wvByDate[v.date] ??= []).push(v);
+
   return dates.map((date) =>
     buildDayRow(date, {
       dailyLog: logByDate[date] ?? null,
@@ -183,6 +224,7 @@ export function computeDayRows(
       workoutSets: wsByDate[date] ?? [],
       plan: planForDate(data.plans, date),
       override: overrideByDate[date] ?? null,
+      widgetValues: wvByDate[date] ?? [],
     }),
   );
 }

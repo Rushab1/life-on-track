@@ -2,6 +2,7 @@
 
 import { useWidgets } from "@/hooks/useWidgets";
 import { useWidgetValues } from "@/hooks/useWidgetValues";
+import { expandWidgetRows } from "@/lib/widgets";
 import type { WidgetDefinition } from "@/lib/types";
 
 interface DayWidgetsProps {
@@ -154,7 +155,8 @@ function WidgetControl({
 
 /**
  * Renders the user's configured widgets for the day: daily/global-scoped ones
- * always, activity-scoped ones once per matching scheduled activity. This is
+ * always, activity-scoped ones once per matching scheduled activity,
+ * sites-scoped ones once per configured body site. This is
  * the read/write surface for widget_values that the Plans-tab configurator
  * creates definitions for.
  */
@@ -172,19 +174,7 @@ export default function DayWidgets({
 
   if (defsLoading || valuesLoading) return null;
 
-  const rows: { widget: WidgetDefinition; activityType: string | null }[] = [];
-  for (const w of widgets) {
-    if (w.scope === "activity") {
-      const filter = Array.isArray(w.activity_filter) ? w.activity_filter : [];
-      const matching =
-        filter.length > 0
-          ? activities.filter((a) => filter.includes(a))
-          : activities;
-      for (const act of matching) rows.push({ widget: w, activityType: act });
-    } else {
-      rows.push({ widget: w, activityType: null });
-    }
-  }
+  const rows = expandWidgetRows(widgets, activities);
 
   if (rows.length === 0) return null;
 
@@ -194,25 +184,28 @@ export default function DayWidgets({
         Trackers
       </h3>
       <div className="space-y-3">
-        {rows.map(({ widget, activityType }) => (
+        {rows.map(({ widget, subject }) => (
           <div
-            key={`${widget.id}:${activityType ?? ""}`}
+            key={`${widget.id}:${subject ?? ""}`}
             className="flex items-center justify-between gap-3"
           >
             <span className="text-sm text-stone-300 flex-shrink-0">
               {widget.name}
-              {activityType && (
+              {subject && (
                 <span className="text-stone-500 text-xs">
                   {" "}
-                  · {activityLabels[activityType] ?? activityType}
+                  ·{" "}
+                  {widget.scope === "sites"
+                    ? subject
+                    : activityLabels[subject] ?? subject}
                 </span>
               )}
             </span>
             <WidgetControl
               widget={widget}
-              value={getValue(widget.id, activityType)}
+              value={getValue(widget.id, subject)}
               onChange={(v, debounceMs) =>
-                setValue(widget.id, v, activityType, debounceMs)
+                setValue(widget.id, v, subject, debounceMs)
               }
             />
           </div>
