@@ -5,6 +5,7 @@ import { toDateString } from "@/lib/dates";
 import { getGymType } from "@/config/schedule";
 import { useWorkoutSets } from "@/hooks/useWorkoutSets";
 import { useLastWorkout } from "@/hooks/useLastWorkout";
+import { getOtherExercises } from "@/lib/workout";
 import type { LastSetRow } from "@/hooks/useLastWorkout";
 import type { Plan, WorkoutSet } from "@/lib/types";
 
@@ -34,11 +35,14 @@ export default function WorkoutLogger({
   const defaultExercises = plan?.workout_templates?.[gymType] ?? [];
   const meta = plan?.workout_meta?.[gymType] ?? { warmup: [], cardio: [] };
   const { sets: loggedSets, add, update, remove, removeAllByExercise } = useWorkoutSets(userId, dateStr);
-  const allExercisesForHistory = [...meta.warmup, ...defaultExercises, ...meta.cardio];
-  const lastSets = useLastWorkout(userId, dateStr, allExercisesForHistory);
+  const [pickedExercises, setPickedExercises] = useState<string[]>([]);
+  const plannedExercises = [...meta.warmup, ...defaultExercises, ...meta.cardio];
+  // Anything logged today that the plan doesn't list (e.g. sets logged via
+  // MCP on an override day) still has to show up, or the work looks lost.
+  const otherExercises = getOtherExercises(plannedExercises, loggedSets, pickedExercises);
+  const lastSets = useLastWorkout(userId, dateStr, [...plannedExercises, ...otherExercises]);
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [extraExercise, setExtraExercise] = useState("");
   const [addingExercise, setAddingExercise] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState("");
 
@@ -54,7 +58,7 @@ export default function WorkoutLogger({
   async function handleAddExercise() {
     if (!newExerciseName.trim()) return;
     await onAddExercise(newExerciseName.trim());
-    setExtraExercise(newExerciseName.trim());
+    setPickedExercises((prev) => [...prev, newExerciseName.trim()]);
     setExpanded((prev) => new Set(prev).add(newExerciseName.trim()));
     setNewExerciseName("");
     setAddingExercise(false);
@@ -114,25 +118,36 @@ export default function WorkoutLogger({
         </div>
       )}
 
+      {/* Logged or picked exercises outside the plan */}
+      {otherExercises.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-stone-500 uppercase tracking-wide mb-1">
+            {plannedExercises.length > 0 ? "Other" : "Exercises"}
+          </p>
+          <div className="space-y-1">{renderAccordions(otherExercises)}</div>
+        </div>
+      )}
+
       {/* Add other exercise */}
       <div className="pt-1 border-t border-white/[0.06]">
         <select
-          value={extraExercise}
+          value=""
           onChange={(e) => {
-            if (e.target.value === "__add_new__") {
+            const value = e.target.value;
+            if (value === "__add_new__") {
               setAddingExercise(true);
               return;
             }
-            setExtraExercise(e.target.value);
-            if (e.target.value) {
-              setExpanded((prev) => new Set(prev).add(e.target.value));
+            if (value) {
+              setPickedExercises((prev) => [...prev, value]);
+              setExpanded((prev) => new Set(prev).add(value));
             }
           }}
           className="input text-sm"
         >
           <option value="">+ Add other exercise...</option>
           {exercises
-            .filter((ex) => !defaultExercises.includes(ex))
+            .filter((ex) => !plannedExercises.includes(ex) && !otherExercises.includes(ex))
             .map((ex) => (
               <option key={ex} value={ex}>{ex}</option>
             ))}
@@ -155,21 +170,6 @@ export default function WorkoutLogger({
           </div>
         )}
 
-        {extraExercise && (
-          <div className="mt-2">
-            <ExerciseAccordion
-              exercise={extraExercise}
-              isOpen={true}
-              onToggle={() => {}}
-              loggedSets={loggedByExercise[extraExercise] ?? []}
-              historySets={[]}
-              onLog={add}
-              onUpdate={update}
-              onRemove={remove}
-              onRemoveAll={() => removeAllByExercise(extraExercise)}
-            />
-          </div>
-        )}
       </div>
     </div>
   );
