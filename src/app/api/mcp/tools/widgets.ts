@@ -2,6 +2,26 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { dateSchema, uuidSchema, safeErrorMessage } from "../validation";
+import { widgetSites } from "@/lib/widgets";
+
+/**
+ * activity_type and site are two names for one column (see lib/widgets). Both
+ * given with different values means the caller is confused about which row it
+ * wants, so say so rather than silently picking one.
+ */
+function conflictingSubject(activityType?: string, site?: string) {
+  if (activityType && site && activityType !== site) {
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `activity_type ("${activityType}") and site ("${site}") both given and differ — they are the same field. Pass just one.`,
+        },
+      ],
+    };
+  }
+  return null;
+}
 
 /**
  * manage_widget — widget admin (list/create/delete/add_option/remove_option).
@@ -16,7 +36,7 @@ export function registerWidgetTools(
 ) {
   server.tool(
     "manage_widget",
-    'Widget admin. action="list" returns all widgets (presets + user). "create" requires name + type (slider|counter|boolean|text|select); optional config, scope (daily|activity|global), activity_filter. "delete" requires id (user-owned only). "add_option" / "remove_option" modify a select widget\'s options array (auto-forks preset widgets into a personal copy on first edit).',
+    'Widget admin. action="list" returns all widgets (presets + user). "create" requires name + type (slider|counter|boolean|text|select); optional config, scope (daily|activity|global|sites), activity_filter. scope="sites" logs one value per body site per day (config.sites lists them) so a 4 at the kneecap stays distinct from a 4 at the ankle — pass the site to log_widget. "delete" requires id (user-owned only). "add_option" / "remove_option" modify a select widget\'s options array, or a sites-scoped widget\'s site list (auto-forks preset widgets into a personal copy on first edit).',
     {
       action: z
         .enum(["list", "create", "delete", "add_option", "remove_option"])
@@ -29,11 +49,11 @@ export function registerWidgetTools(
       config: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe("Type-specific config. slider/counter: {min,max,step,unit}. text: {placeholder}. select: {options:string[]}."),
+        .describe("Type-specific config. slider/counter: {min,max,step,unit}. text: {placeholder}. select: {options:string[]}. Plus {sites:string[]} for scope=sites."),
       scope: z
-        .enum(["daily", "activity", "global"])
+        .enum(["daily", "activity", "global", "sites"])
         .optional()
-        .describe("When to show this widget. Default: daily"),
+        .describe("When to show this widget. Default: daily. sites = one value per body site per day."),
       activity_filter: z
         .array(z.string())
         .optional()
@@ -42,9 +62,17 @@ export function registerWidgetTools(
         .string()
         .max(200)
         .optional()
-        .describe("Option string (for add_option/remove_option)"),
+        .describe(
+          "For add_option/remove_option: a select widget's option, or a sites-scoped widget's site name.",
+        ),
+      site: z
+        .string()
+        .max(50)
+        .optional()
+        .describe("Alias for `option` when editing a sites-scoped widget's site list."),
     },
-    async ({ action, id, name, type, config, scope, activity_filter, option }) => {
+    async ({ action, id, name, type, config, scope, activity_filter, option, site }) => {
+      const entry = option ?? site;
       if (action === "list") {
         const { data, error } = await client
           .from("widget_definitions")
@@ -89,6 +117,17 @@ export function registerWidgetTools(
             ],
           };
         }
+        if (scope === "sites" && widgetSites({ scope, config: config ?? {} }).length === 0) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: 'scope="sites" requires config.sites — a non-empty array of site names, e.g. {"sites":["kneecap","ankle","ITB"]}.',
+              },
+            ],
+          };
+        }
+
         const { data, error } = await client
           .from("widget_definitions")
           .insert({
@@ -140,12 +179,12 @@ export function registerWidgetTools(
       }
 
       if (action === "add_option" || action === "remove_option") {
-        if (!id || !option) {
+        if (!id || !entry) {
           return {
             content: [
               {
                 type: "text" as const,
-                text: `action=${action} requires id and option.`,
+                text: `action=${action} requires id and option (or site).`,
               },
             ],
           };
@@ -162,35 +201,52 @@ export function registerWidgetTools(
             content: [{ type: "text" as const, text: "Widget not found." }],
           };
         }
-        if (widget.type !== "select") {
+        // A sites-scoped widget keeps its list in config.sites whatever its
+        // control type; only select widgets keep one in config.options.
+        const isSites = widget.scope === "sites";
+        if (!isSites && widget.type !== "select") {
           return {
             content: [
-              { type: "text" as const, text: "Widget is not a select type." },
+              {
+                type: "text" as const,
+                text: "Widget has no editable list: it is neither a select type nor sites-scoped.",
+              },
             ],
           };
         }
+        const listKey = isSites ? "sites" : "options";
 
         const widgetConfig = (widget.config ?? {}) as Record<string, unknown>;
-        let options = Array.isArray(widgetConfig.options)
-          ? [...(widgetConfig.options as string[])]
+        let list = Array.isArray(widgetConfig[listKey])
+          ? [...(widgetConfig[listKey] as string[])]
           : [];
 
         if (action === "add_option") {
-          if (options.includes(option)) {
+          if (list.includes(entry)) {
             return {
               content: [
                 {
                   type: "text" as const,
-                  text: `"${option}" already exists in the list.`,
+                  text: `"${entry}" already exists in the list.`,
                 },
               ],
             };
           }
-          options.push(option);
+          list.push(entry);
         } else {
-          options = options.filter((o: string) => o !== option);
+          if (isSites && list.length === 1 && list[0] === entry) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: "Cannot remove the last site — a sites-scoped widget needs at least one. Delete the widget instead.",
+                },
+              ],
+            };
+          }
+          list = list.filter((o: string) => o !== entry);
         }
-        widgetConfig.options = options;
+        widgetConfig[listKey] = list;
 
         // Preset widgets: user can't modify — fork into a personal copy
         if (widget.user_id === null) {
@@ -199,7 +255,7 @@ export function registerWidgetTools(
               content: [
                 {
                   type: "text" as const,
-                  text: "Cannot remove options from a preset widget. Create a personal copy first by adding an option, then remove from that copy.",
+                  text: "Cannot remove entries from a preset widget. Create a personal copy first by adding one, then remove from that copy.",
                 },
               ],
             };
@@ -228,7 +284,7 @@ export function registerWidgetTools(
             content: [
               {
                 type: "text" as const,
-                text: `Added "${option}". Created personal copy of preset widget (new id: ${copy.id}).`,
+                text: `Added "${entry}". Created personal copy of preset widget (new id: ${copy.id}).`,
               },
             ],
           };
@@ -250,8 +306,8 @@ export function registerWidgetTools(
               type: "text" as const,
               text:
                 action === "add_option"
-                  ? `Added "${option}" to widget options.`
-                  : `Removed "${option}" from widget options.`,
+                  ? `Added "${entry}" to widget ${listKey}.`
+                  : `Removed "${entry}" from widget ${listKey}.`,
             },
           ],
         };
@@ -265,7 +321,7 @@ export function registerWidgetTools(
 
   server.tool(
     "log_widget",
-    "Log a widget value for a date. For activity-scoped widgets, provide activity_type. Value type depends on widget: slider/counter → number, boolean → true/false, text → string, select → string (must be one of the widget's options).",
+    "Log a widget value for a date. For activity-scoped widgets, provide activity_type. For sites-scoped widgets, provide site — one value per body site per day, so call it once per site you're recording. Value type depends on widget: slider/counter → number, boolean → true/false, text → string, select → string (must be one of the widget's options).",
     {
       widget_id: uuidSchema.describe("Widget ID"),
       date: dateSchema.describe("Date in YYYY-MM-DD format"),
@@ -277,8 +333,19 @@ export function registerWidgetTools(
         .max(50)
         .optional()
         .describe("Activity code (required for activity-scoped widgets)"),
+      site: z
+        .string()
+        .max(50)
+        .optional()
+        .describe(
+          "Body site, one of the widget's configured sites (required for sites-scoped widgets). Stored in the same column as activity_type.",
+        ),
     },
-    async ({ widget_id, date, value, activity_type }) => {
+    async ({ widget_id, date, value, activity_type, site }) => {
+      const subjectErr = conflictingSubject(activity_type, site);
+      if (subjectErr) return subjectErr;
+      const subject = site ?? activity_type ?? null;
+
       const { data: widget, error: fetchErr } = await client
         .from("widget_definitions")
         .select("type, config, scope")
@@ -291,7 +358,7 @@ export function registerWidgetTools(
         };
       }
 
-      if (widget.scope === "activity" && !activity_type) {
+      if (widget.scope === "activity" && !subject) {
         return {
           content: [
             {
@@ -300,6 +367,30 @@ export function registerWidgetTools(
             },
           ],
         };
+      }
+
+      if (widget.scope === "sites") {
+        const sites = widgetSites(widget);
+        if (!subject) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `site is required for sites-scoped widgets. Configured sites: ${sites.join(", ")}`,
+              },
+            ],
+          };
+        }
+        if (!sites.includes(subject)) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Unknown site "${subject}". Configured sites: ${sites.join(", ")}. Add it with manage_widget action="add_option".`,
+              },
+            ],
+          };
+        }
       }
 
       const widgetConfig = (widget.config ?? {}) as Record<string, unknown>;
@@ -392,15 +483,14 @@ export function registerWidgetTools(
         }
       }
 
-      const normalizedActivity = activity_type ?? null;
       let updateQuery = client
         .from("widget_values")
         .update({ value, updated_at: new Date().toISOString() })
         .eq("user_id", userId)
         .eq("widget_id", widget_id)
         .eq("date", date);
-      if (normalizedActivity) {
-        updateQuery = updateQuery.eq("activity_type", normalizedActivity);
+      if (subject) {
+        updateQuery = updateQuery.eq("activity_type", subject);
       } else {
         updateQuery = updateQuery.is("activity_type", null);
       }
@@ -416,7 +506,7 @@ export function registerWidgetTools(
           user_id: userId,
           widget_id,
           date,
-          activity_type: normalizedActivity,
+          activity_type: subject,
           value,
           updated_at: new Date().toISOString(),
         });
@@ -428,14 +518,21 @@ export function registerWidgetTools(
       }
 
       return {
-        content: [{ type: "text" as const, text: `Widget value saved for ${date}.` }],
+        content: [
+          {
+            type: "text" as const,
+            text: subject
+              ? `Widget value saved for ${date} (${subject}).`
+              : `Widget value saved for ${date}.`,
+          },
+        ],
       };
     },
   );
 
   server.tool(
     "delete_widget_value",
-    "Delete a logged widget value for a date.",
+    "Delete a logged widget value for a date. Deletes one row: pass activity_type (activity-scoped) or site (sites-scoped) to say which.",
     {
       widget_id: uuidSchema.describe("Widget ID"),
       date: dateSchema.describe("Date in YYYY-MM-DD format"),
@@ -444,16 +541,25 @@ export function registerWidgetTools(
         .max(50)
         .optional()
         .describe("Activity code (if activity-scoped)"),
+      site: z
+        .string()
+        .max(50)
+        .optional()
+        .describe("Body site (if sites-scoped)"),
     },
-    async ({ widget_id, date, activity_type }) => {
+    async ({ widget_id, date, activity_type, site }) => {
+      const subjectErr = conflictingSubject(activity_type, site);
+      if (subjectErr) return subjectErr;
+      const subject = site ?? activity_type ?? null;
+
       let query = client
         .from("widget_values")
         .delete()
         .eq("user_id", userId)
         .eq("widget_id", widget_id)
         .eq("date", date);
-      if (activity_type) {
-        query = query.eq("activity_type", activity_type);
+      if (subject) {
+        query = query.eq("activity_type", subject);
       } else {
         query = query.is("activity_type", null);
       }

@@ -140,7 +140,7 @@ create table widget_definitions (
   name text not null,
   type text not null check (type in ('slider', 'counter', 'boolean', 'text', 'select')),
   config jsonb not null default '{}',
-  scope text not null default 'daily' check (scope in ('daily', 'activity', 'global')),
+  scope text not null default 'daily' check (scope in ('daily', 'activity', 'global', 'sites')),
   activity_filter text[],
   preset boolean default false,
   sort_order int default 0,
@@ -158,7 +158,9 @@ create table widget_values (
   updated_at timestamptz default now()
 );
 
--- Coalesce NULL activity_type for uniqueness (NULL != NULL in Postgres)
+-- activity_type carries the activity code for scope='activity' widgets and the
+-- body site for scope='sites' ones, so a sites-scoped widget gets one row per
+-- site per day. Coalesce NULL for uniqueness (NULL != NULL in Postgres).
 create unique index idx_widget_values_upsert
   on widget_values(user_id, widget_id, date, coalesce(activity_type, ''));
 

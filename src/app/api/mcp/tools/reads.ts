@@ -17,6 +17,7 @@ import {
   computeDayRows,
   enumerateDates,
   type DayRow,
+  type WidgetValueRow,
 } from "./history-helpers";
 
 /**
@@ -33,7 +34,7 @@ async function fetchDayRows(
   const dates = enumerateDates(startDate, endDate);
   if (dates.length === 0) return { rows: [], error: null };
 
-  const [logsRes, actsRes, wsRes, plansRes, overridesRes] = await Promise.all([
+  const [logsRes, actsRes, wsRes, plansRes, overridesRes, wvRes] = await Promise.all([
     client
       .from("daily_logs")
       .select("*")
@@ -65,6 +66,12 @@ async function fetchDayRows(
       .eq("user_id", userId)
       .gte("date", startDate)
       .lte("date", endDate),
+    client
+      .from("widget_values")
+      .select("widget_id, date, activity_type, value, widget_definitions(name, scope)")
+      .eq("user_id", userId)
+      .gte("date", startDate)
+      .lte("date", endDate),
   ]);
 
   const error =
@@ -73,6 +80,7 @@ async function fetchDayRows(
     wsRes.error ??
     plansRes.error ??
     overridesRes.error ??
+    wvRes.error ??
     null;
   if (error) return { rows: [], error };
 
@@ -82,6 +90,7 @@ async function fetchDayRows(
     workouts: (wsRes.data ?? []) as WorkoutSet[],
     plans: (plansRes.data ?? []) as Plan[],
     overrides: (overridesRes.data ?? []) as { date: string; gym_type: string }[],
+    widgetValues: (wvRes.data ?? []) as unknown as WidgetValueRow[],
   });
   return { rows, error: null };
 }
@@ -101,7 +110,7 @@ export function registerReadTools(
 ) {
   server.tool(
     "get_day",
-    'Get everything for a single date in one call: pain level, notes, active plan (with exercise templates), any day override, scheduled + ad-hoc activities, workout sets grouped by exercise, widget values, life events, Google Calendar events, and Oura Ring metrics (sleep/readiness/activity scores, HRV, resting HR, steps). This is the canonical starting tool — call it first when the user asks about a day. WORKOUT LOGGING PROTOCOL — call this FIRST. After showing notes + plan, collect a baseline pain panel (multiple-choice body parts drawn from the last 7 days of logs and today\'s notes) BEFORE any sets are discussed, and persist it with save_day. Then follow the per-set protocol described on log_workout. Follow the workout-logging prompt for the full session protocol.',
+    'Get everything for a single date in one call: pain level, notes, active plan (with exercise templates), any day override, scheduled + ad-hoc activities, workout sets grouped by exercise, widget values, life events, Google Calendar events, and Oura Ring metrics (sleep/readiness/activity scores, HRV, resting HR, steps). This is the canonical starting tool — call it first when the user asks about a day. WORKOUT LOGGING PROTOCOL — call this FIRST. After showing notes + plan, collect a baseline pain panel (multiple-choice body parts drawn from the last 7 days of logs and today\'s notes) BEFORE any sets are discussed, and persist it with save_day — plus one log_widget call per site if a sites-scoped pain widget exists, so each site\'s number is chartable rather than only prose. Then follow the per-set protocol described on log_workout. Follow the workout-logging prompt for the full session protocol.',
     { date: dateSchema.describe("Date in YYYY-MM-DD format") },
     async ({ date }) => {
       // Self-sufficient Oura: pull fresh data on demand so the MCP doesn't
@@ -161,7 +170,7 @@ export function registerReadTools(
           .order("created_at"),
         client
           .from("widget_values")
-          .select("widget_id, value, activity_type, widget_definitions(name, type)")
+          .select("widget_id, value, activity_type, widget_definitions(name, type, scope)")
           .eq("user_id", userId)
           .eq("date", date),
         client
@@ -280,6 +289,8 @@ export function registerReadTools(
             widget_id: v.widget_id,
             widget_name: def?.name ?? "Unknown",
             widget_type: def?.type,
+            widget_scope: def?.scope,
+            // For a sites-scoped widget this is the body site, not an activity.
             activity_type: v.activity_type,
             value: v.value,
           };
@@ -339,7 +350,7 @@ export function registerReadTools(
 
   server.tool(
     "get_history",
-    "Get history across a date range, a count of recent days, or recent sessions per exercise. Mode A (range summary): provide start_date and/or end_date (default: last 7 days) — returns avg pain, activity completion rates, workout days, and total exercises; add per_day:true to also get a day-by-day breakdown (each day's plan code, pain, notes, activities, and per-exercise set summary, max 92 days). Mode B (progressive overload / recent instances): provide exercises (and optionally before_date, default today) — returns the most recent sessions per exercise before that date; pass a single exercise name to get just its recent N instances. Use `sessions` to control how many recent sessions per exercise are returned (default 3). Mode C (recent N days): provide recent_days:N — returns the last N calendar days (ending today or at end_date), newest first, each with its plan code, pain, notes, activities, and workout summary. PROTOCOL: use Mode B (per-exercise recent sessions) BEFORE offering set options, so options reflect the user's actual prior numbers. Also use at session end to compare today's cardio/HR-zone work against the most recent session of the same activity. Follow the workout-logging prompt for the full session protocol.",
+    "Get history across a date range, a count of recent days, or recent sessions per exercise. Mode A (range summary): provide start_date and/or end_date (default: last 7 days) — returns avg pain, activity completion rates, workout days, and total exercises; add per_day:true to also get a day-by-day breakdown (each day's plan code, pain, notes, activities, per-exercise set summary, and logged widget values — including one entry per body site for sites-scoped widgets, max 92 days). Mode B (progressive overload / recent instances): provide exercises (and optionally before_date, default today) — returns the most recent sessions per exercise before that date; pass a single exercise name to get just its recent N instances. Use `sessions` to control how many recent sessions per exercise are returned (default 3). Mode C (recent N days): provide recent_days:N — returns the last N calendar days (ending today or at end_date), newest first, each with its plan code, pain, notes, activities, workout summary, and widget values (one entry per body site for sites-scoped widgets). PROTOCOL: use Mode B (per-exercise recent sessions) BEFORE offering set options, so options reflect the user's actual prior numbers. Also use at session end to compare today's cardio/HR-zone work against the most recent session of the same activity. Follow the workout-logging prompt for the full session protocol.",
     {
       start_date: dateSchema
         .optional()
@@ -353,7 +364,7 @@ export function registerReadTools(
         .boolean()
         .optional()
         .describe(
-          "Mode A: also return a day-by-day breakdown (each day's plan code, pain, notes, activities, and per-exercise set summary). Range capped at 92 days.",
+          "Mode A: also return a day-by-day breakdown (each day's plan code, pain, notes, activities, per-exercise set summary, and widget values). Range capped at 92 days.",
         ),
       recent_days: z
         .number()

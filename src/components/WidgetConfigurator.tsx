@@ -12,11 +12,85 @@ const WIDGET_TYPES: { value: WidgetDefinition["type"]; label: string }[] = [
   { value: "select", label: "Select" },
 ];
 
-const SCOPE_OPTIONS: { value: WidgetDefinition["scope"]; label: string }[] = [
+const SCOPE_OPTIONS: {
+  value: WidgetDefinition["scope"];
+  label: string;
+  hint?: string;
+}[] = [
   { value: "daily", label: "Daily" },
   { value: "activity", label: "Activity" },
   { value: "global", label: "Global" },
+  {
+    value: "sites",
+    label: "Per site",
+    hint: "One value per body site, each logged separately.",
+  },
 ];
+
+/** Editable string list, shared by select options and per-site scopes. */
+function StringListEditor({
+  label,
+  placeholder,
+  items,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  items: string[];
+  onChange: (items: string[]) => void;
+}) {
+  const [draft, setDraft] = useState("");
+
+  function add() {
+    const value = draft.trim();
+    if (!value || items.includes(value)) {
+      setDraft("");
+      return;
+    }
+    onChange([...items, value]);
+    setDraft("");
+  }
+
+  return (
+    <div className="space-y-2">
+      <label className="label mb-0">{label}</label>
+      {items.map((item, i) => (
+        <div key={item} className="flex items-center gap-2">
+          <span className="text-sm text-stone-300 flex-1">{item}</span>
+          <button
+            type="button"
+            onClick={() => onChange(items.filter((_, j) => j !== i))}
+            className="btn btn-danger-ghost text-xs px-2 py-1"
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder={placeholder}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          className="input flex-1 text-sm py-1.5"
+        />
+        <button
+          type="button"
+          onClick={add}
+          className="btn btn-secondary text-xs px-3 py-1.5"
+        >
+          Add
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function typeBadge(type: string) {
   const colors: Record<string, string> = {
@@ -123,9 +197,9 @@ function CreateWidgetForm({
   const [unit, setUnit] = useState("");
   const [placeholder, setPlaceholder] = useState("");
   const [options, setOptions] = useState<string[]>([]);
-  const [newOption, setNewOption] = useState("");
+  const [sites, setSites] = useState<string[]>([]);
 
-  function buildConfig(): Record<string, unknown> {
+  function typeConfig(): Record<string, unknown> {
     switch (type) {
       case "slider":
       case "counter":
@@ -145,9 +219,17 @@ function CreateWidgetForm({
     }
   }
 
+  function buildConfig(): Record<string, unknown> {
+    return { ...typeConfig(), ...(scope === "sites" ? { sites } : {}) };
+  }
+
+  // A sites-scoped widget with no sites has nothing to log against, and the
+  // MCP create path rejects it too.
+  const incomplete = !name.trim() || (scope === "sites" && sites.length === 0);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (incomplete) return;
     setSaving(true);
     await onSave({ name: name.trim(), type, config: buildConfig(), scope });
     setSaving(false);
@@ -221,41 +303,18 @@ function CreateWidgetForm({
       )}
 
       {type === "select" && (
-        <div className="space-y-2">
-          <label className="label mb-0">Options</label>
-          {options.map((opt, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <span className="text-sm text-stone-300 flex-1">{opt}</span>
-              <button type="button" onClick={() => setOptions(options.filter((_, j) => j !== i))}
-                className="btn btn-danger-ghost text-xs px-2 py-1">
-                Remove
-              </button>
-            </div>
-          ))}
-          <div className="flex gap-2">
-            <input type="text" value={newOption} onChange={(e) => setNewOption(e.target.value)}
-              placeholder="Add option..."
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && newOption.trim()) {
-                  e.preventDefault();
-                  setOptions([...options, newOption.trim()]);
-                  setNewOption("");
-                }
-              }}
-              className="input flex-1 text-sm py-1.5" />
-            <button type="button"
-              onClick={() => { if (newOption.trim()) { setOptions([...options, newOption.trim()]); setNewOption(""); } }}
-              className="btn btn-secondary text-xs px-3 py-1.5">
-              Add
-            </button>
-          </div>
-        </div>
+        <StringListEditor
+          label="Options"
+          placeholder="Add option..."
+          items={options}
+          onChange={setOptions}
+        />
       )}
 
       {/* Scope selector */}
       <div>
         <label className="label">Scope</label>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {SCOPE_OPTIONS.map((s) => (
             <button
               key={s.value}
@@ -271,11 +330,25 @@ function CreateWidgetForm({
             </button>
           ))}
         </div>
+        {SCOPE_OPTIONS.find((s) => s.value === scope)?.hint && (
+          <p className="text-xs text-stone-500 mt-1.5">
+            {SCOPE_OPTIONS.find((s) => s.value === scope)!.hint}
+          </p>
+        )}
       </div>
 
+      {scope === "sites" && (
+        <StringListEditor
+          label="Sites"
+          placeholder="e.g. kneecap, ankle, ITB..."
+          items={sites}
+          onChange={setSites}
+        />
+      )}
+
       <div className="flex gap-2">
-        <button type="submit" disabled={saving}
-          className="btn btn-primary flex-1 py-2.5">
+        <button type="submit" disabled={saving || incomplete}
+          className="btn btn-primary flex-1 py-2.5 disabled:opacity-50">
           {saving ? "Creating..." : "Create widget"}
         </button>
         <button type="button" onClick={onCancel}
